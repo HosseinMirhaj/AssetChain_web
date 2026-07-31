@@ -1,0 +1,4154 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Coins, 
+  Wallet, 
+  History, 
+  MessageSquare, 
+  LogOut, 
+  LogIn, 
+  Globe, 
+  Sun, 
+  Moon, 
+  TrendingUp, 
+  MapPin, 
+  CheckCircle, 
+  Clock, 
+  ArrowUpRight, 
+  ArrowDownRight, 
+  Percent, 
+  Copy, 
+  Menu, 
+  X, 
+  Info,
+  Check,
+  User,
+  ShieldCheck,
+  Share2,
+  DollarSign,
+  Search,
+  LayoutDashboard,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  ExternalLink
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Asset, PortfolioItem, PurchaseLot, Transaction, Theme, Language, LimitOrder, UserActivity, PriceAlert } from './types';
+import { INITIAL_ASSETS, TRANSLATIONS } from './data';
+import LandingPage from './components/LandingPage';
+import YieldChart from './components/YieldChart';
+
+export default function App() {
+  // Theme & Language State
+  const [theme, setTheme] = useState<Theme>('dark');
+  const [lang, setLang] = useState<Language>('en');
+
+  // Authentication State
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false); // Start logged out so the user can see the login/signup buttons initially
+  const [currentUser, setCurrentUser] = useState({
+    username: 'demo',
+    email: 'demo@assetchain.app',
+    usdtBalance: 15450.00,
+  });
+
+  // Navigation State
+  const [currentTab, setCurrentTab] = useState<'home' | 'market' | 'portfolio' | 'wallet' | 'history' | 'support' | 'about' | 'contact'>('home');
+  const [marketFilter, setMarketFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Modals & Panels State
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [authMode, setAuthMode] = useState<'signIn' | 'signUp'>('signIn');
+  const [authUsername, setAuthUsername] = useState<string>('demo');
+  const [authPassword, setAuthPassword] = useState<string>('1234');
+  const [authError, setAuthError] = useState<string>('');
+
+  const [isBuyModalOpen, setIsBuyModalOpen] = useState<boolean>(false);
+  const [isSellModalOpen, setIsSellModalOpen] = useState<boolean>(false);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+
+  // Asset Info Modal State
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState<boolean>(false);
+  const [infoAsset, setInfoAsset] = useState<Asset | null>(null);
+
+  const handleOpenAssetInfo = (asset: Asset) => {
+    setInfoAsset(asset);
+    setIsInfoModalOpen(true);
+  };
+
+  // Trade Inputs
+  const [buyAmount, setBuyAmount] = useState<string>('');
+  const [sellShares, setSellShares] = useState<string>('');
+
+  // Notifications / Alert Feedbacks
+  const [alertMessage, setAlertMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  // App Wallet Staking/Deposit State
+  const [walletTab, setWalletTab] = useState<'deposit' | 'withdraw'>('deposit');
+  const [depositNetwork, setDepositNetwork] = useState<'trc20' | 'erc20' | 'bep20'>('trc20');
+  const [depositTxid, setDepositTxid] = useState<string>('');
+  const [withdrawAddress, setWithdrawAddress] = useState<string>('');
+  const [withdrawAmount, setWithdrawAmount] = useState<string>('');
+  const [txidError, setTxidError] = useState<string>('');
+  const [withdrawAddrError, setWithdrawAddrError] = useState<string>('');
+
+  // Support State
+  const [supportText, setSupportText] = useState<string>('');
+
+  // User Portfolio Data (stored in state so it adapts when buying/selling)
+  const [myPortfolio, setMyPortfolio] = useState<PortfolioItem[]>([
+    { assetId: 'FOOLAD', shares: 12000, avgPrice: 0.080 },
+    { assetId: 'JUMEIRAH', shares: 15, avgPrice: 245.00 },
+    { assetId: 'GOLD', shares: 3, avgPrice: 1180.00 }
+  ]);
+
+  // Detailed Purchase Lots for each asset to show exact buy time, price, and volume
+  const [purchaseLots, setPurchaseLots] = useState<PurchaseLot[]>([
+    { id: 'LOT-301', assetId: 'FOOLAD', shares: 5000, price: 0.078, date: '2026-06-25 10:30' },
+    { id: 'LOT-302', assetId: 'FOOLAD', shares: 7000, price: 0.0814, date: '2026-07-01 11:15' },
+    { id: 'LOT-303', assetId: 'JUMEIRAH', shares: 10, price: 240.00, date: '2026-06-20 14:00' },
+    { id: 'LOT-304', assetId: 'JUMEIRAH', shares: 5, price: 255.00, date: '2026-06-28 16:20' },
+    { id: 'LOT-305', assetId: 'GOLD', shares: 2, price: 1175.00, date: '2026-07-03 09:15' },
+    { id: 'LOT-306', assetId: 'GOLD', shares: 1, price: 1190.00, date: '2026-07-08 16:45' },
+  ]);
+
+  const [portfolioViewMode, setPortfolioViewMode] = useState<'aggregated' | 'detailed'>('aggregated');
+
+  // Transaction History Data
+  const [transactions, setTransactions] = useState<Transaction[]>([
+    { id: 'TX-1049', type: 'deposit', asset: 'USDT (TRC20)', amount: '+5,000.00', date: '2026-07-02 18:40', status: 'completed' },
+    { id: 'TX-1048', type: 'buy', asset: 'FOOLAD', amount: '-960.00', date: '2026-07-01 11:15', status: 'completed' },
+    { id: 'TX-1047', type: 'sell', asset: 'AAPL', amount: '+927.50', date: '2026-06-28 09:30', status: 'completed' },
+    { id: 'TX-1046', type: 'withdraw', asset: 'USDT (ERC20)', amount: '-150.00', date: '2026-06-25 14:22', status: 'pending' },
+  ]);
+
+  // Limit Orders State (Buy & Sell Orders)
+  const [limitOrders, setLimitOrders] = useState<LimitOrder[]>([
+    { id: 'ORD-501', assetId: 'GOLD', type: 'buy', price: 1150.00, amount: 2300, date: '2026-07-08 14:20', status: 'pending' },
+    { id: 'ORD-502', assetId: 'FOOLAD', type: 'sell', price: 0.090, amount: 5000, date: '2026-07-08 15:10', status: 'pending' },
+    { id: 'ORD-503', assetId: 'JUMEIRAH', type: 'buy', price: 240.00, amount: 1200, date: '2026-07-07 10:05', status: 'executed' }
+  ]);
+
+  // Live Assets Pricing state
+  const [assets, setAssets] = useState<Asset[]>(INITIAL_ASSETS);
+
+  // Price Alerts State
+  const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([
+    { id: 'ALT-801', assetId: 'GOLD', targetPrice: 1200.00, condition: 'above', isTriggered: false, date: '2026-07-08 14:30' },
+    { id: 'ALT-802', assetId: 'FOOLAD', targetPrice: 0.075, condition: 'below', isTriggered: false, date: '2026-07-09 09:15' }
+  ]);
+
+  // Modal active tab & states for alerts & limits inside buy modal
+  const [buyModalTab, setBuyModalTab] = useState<'instant' | 'limit' | 'alert'>('instant');
+  const [buyLimitPrice, setBuyLimitPrice] = useState<string>('');
+  const [buyLimitShares, setBuyLimitShares] = useState<string>('');
+  const [buyAlertPrice, setBuyAlertPrice] = useState<string>('');
+  const [buyAlertCondition, setBuyAlertCondition] = useState<'above' | 'below'>('above');
+
+  // User Activities State
+  const [activities, setActivities] = useState<UserActivity[]>([
+    { id: 'ACT-001', type: 'login', descriptionEn: 'User logged in successfully', descriptionFa: 'ورود موفقیت‌آمیز به حساب کاربری', date: '2026-07-09 10:12' },
+    { id: 'ACT-002', type: 'trade', descriptionEn: 'Bought 3 shares of #GOLD at 1180.00 USDT', descriptionFa: 'خرید ۳ سهم از #GOLD با قیمت ۱۱۸۰.۰۰ تتر', date: '2026-07-08 16:45' },
+    { id: 'ACT-003', type: 'order_create', descriptionEn: 'Created buy limit order ORD-501 for #GOLD at 1150.00 USDT', descriptionFa: 'ثبت سفارش خرید محدود ORD-501 برای #GOLD روی قیمت ۱۱۵۰.۰۰ تتر', date: '2026-07-08 14:20' },
+    { id: 'ACT-004', type: 'deposit', descriptionEn: 'Deposited 5,000.00 USDT via TRC20', descriptionFa: 'شارژ ۵,۰۰۰.۰۰ تتر از طریق شبکه TRC20', date: '2026-07-02 18:40' },
+  ]);
+
+  // Form states for creating a new Limit Order inside portfolio
+  const [newOrderAssetId, setNewOrderAssetId] = useState<string>('GOLD');
+  const [newOrderType, setNewOrderType] = useState<'buy' | 'sell'>('buy');
+  const [newOrderPrice, setNewOrderPrice] = useState<string>('');
+  const [newOrderAmount, setNewOrderAmount] = useState<string>(''); // USDT for Buy, Shares for Sell
+  const [portfolioSubTab, setPortfolioSubTab] = useState<'orders' | 'activity'>('orders');
+  const [showPortfolioChart, setShowPortfolioChart] = useState<boolean>(true);
+
+  // Helper to record user activities dynamically
+  const recordActivity = (type: string, descriptionEn: string, descriptionFa: string) => {
+    const newAct: UserActivity = {
+      id: `ACT-${Math.floor(100 + Math.random() * 900)}`,
+      type,
+      descriptionEn,
+      descriptionFa,
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16)
+    };
+    setActivities(prev => [newAct, ...prev]);
+  };
+
+  // UI state for Mobile Hamburger Menu
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  const [copiedCode, setCopiedCode] = useState<boolean>(false);
+
+  // Dynamic APY / TVL / Units Stats
+  const [stats, setStats] = useState({
+    tvl: 124580250,
+    soldUnits: 12480,
+  });
+
+  const t = TRANSLATIONS[lang];
+
+  // Auto Dismiss alerts
+  useEffect(() => {
+    if (alertMessage) {
+      const timer = setTimeout(() => {
+        setAlertMessage(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [alertMessage]);
+
+  // Apply layout theme body classes
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [theme]);
+
+  // Real-time pricing fluctuations & automated limit/OTC execution checking
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAssets(prevAssets => {
+        const nextAssets = prevAssets.map(asset => {
+          // Small realistic price change (-0.3% to +0.3%)
+          const pct = (Math.random() * 0.6 - 0.3) / 100;
+          const newPrice = Math.max(0.0001, parseFloat((asset.price * (1 + pct)).toFixed(4)));
+          
+          // Get original base price from INITIAL_ASSETS to calculate correct daily change percentage
+          const original = INITIAL_ASSETS.find(a => a.id === asset.id);
+          const basePrice = original ? original.price : asset.price;
+          const changePct = parseFloat((((newPrice - basePrice) / basePrice) * 100).toFixed(2));
+          
+          return {
+            ...asset,
+            price: newPrice,
+            change: changePct
+          };
+        });
+
+        // ─── Automated Order Execution ───
+        if (isLoggedIn) {
+          limitOrders.forEach(order => {
+            if (order.status !== 'pending') return;
+            const liveAsset = nextAssets.find(a => a.id === order.assetId);
+            if (!liveAsset) return;
+
+            let triggerExecution = false;
+            if (order.type === 'buy' && liveAsset.price <= order.price) {
+              triggerExecution = true;
+            } else if (order.type === 'sell' && liveAsset.price >= order.price) {
+              triggerExecution = true;
+            }
+
+            if (triggerExecution) {
+              // Execute this limit order automatically in the next tick
+              setTimeout(() => {
+                handleExecuteLimitOrder(order.id);
+              }, 10);
+            }
+          });
+
+          // ─── Real-time Price Alerts ───
+          priceAlerts.forEach(alert => {
+            if (alert.isTriggered) return;
+            const liveAsset = nextAssets.find(a => a.id === alert.assetId);
+            if (!liveAsset) return;
+
+            let triggerAlertNotify = false;
+            if (alert.condition === 'above' && liveAsset.price >= alert.targetPrice) {
+              triggerAlertNotify = true;
+            } else if (alert.condition === 'below' && liveAsset.price <= alert.targetPrice) {
+              triggerAlertNotify = true;
+            }
+
+            if (triggerAlertNotify) {
+              // Trigger the notification alert and mark alert as triggered
+              setTimeout(() => {
+                const nameStr = lang === 'fa' ? liveAsset.faName : liveAsset.enName;
+                triggerAlert('success', lang === 'fa'
+                  ? `🔔 هشدار: قیمت دارایی ${nameStr} به هدف ${alert.targetPrice} تتر رسید! (قیمت فعلی: ${liveAsset.price} تتر)`
+                  : `🔔 Alert: ${liveAsset.enName} has reached target of ${alert.targetPrice} USDT! (Current: ${liveAsset.price} USDT)`
+                );
+                setPriceAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, isTriggered: true } : a));
+                recordActivity('alert_trigger', 
+                  `Price alert triggered for #${alert.assetId} at ${alert.targetPrice} USDT`,
+                  `فعال شدن هشدار قیمت برای #${alert.assetId} روی قیمت ${alert.targetPrice} تتر`
+                );
+              }, 10);
+            }
+          });
+        }
+
+        return nextAssets;
+      });
+    }, 4000); // every 4 seconds for lively simulation
+
+    return () => clearInterval(interval);
+  }, [limitOrders, priceAlerts, isLoggedIn, lang]);
+
+  // Helper for triggering alert notifications
+  const triggerAlert = (type: 'success' | 'error', text: string) => {
+    setAlertMessage({ type, text });
+  };
+
+  // Auth Functions
+  const handleAuthSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (authMode === 'signIn') {
+      if (authUsername.trim().toLowerCase() === 'demo' && authPassword === '1234') {
+        setIsLoggedIn(true);
+        setCurrentTab('portfolio');
+        setIsAuthModalOpen(false);
+        setAuthError('');
+        triggerAlert('success', lang === 'fa' ? `خوش آمدید، ${currentUser.username}` : `Welcome back, ${currentUser.username}`);
+        recordActivity('login', 'User logged in successfully', 'ورود موفقیت‌آمیز به حساب کاربری');
+      } else {
+        setAuthError(t.loginError);
+      }
+    } else {
+      // Sign Up simulation
+      if (authUsername.trim() && authPassword.length >= 4) {
+        setCurrentUser({
+          username: authUsername,
+          email: `${authUsername}@assetchain.app`,
+          usdtBalance: 10000.00, // starting balance for new users
+        });
+        setIsLoggedIn(true);
+        setCurrentTab('portfolio');
+        setIsAuthModalOpen(false);
+        setAuthError('');
+        triggerAlert('success', lang === 'fa' ? 'حساب کاربری جدید با ۱,۰۰۰ تتر هدیه ساخته شد!' : 'New account created with 1,000 USDT gift!');
+        recordActivity('signup', `Created a new account with username: ${authUsername}`, `ایجاد حساب کاربری جدید با نام کاربری: ${authUsername}`);
+      } else {
+        setAuthError(lang === 'fa' ? 'لطفاً نام کاربری و رمز عبور (حداقل ۴ کاراکتر) وارد کنید.' : 'Please enter username and password (min 4 chars).');
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setIsDropdownOpen(false);
+    setCurrentTab('market');
+    triggerAlert('success', lang === 'fa' ? 'از حساب کاربری خود خارج شدید.' : 'Logged out successfully.');
+  };
+
+  // Buy Order Exec
+  const handleBuySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAsset) return;
+    const investAmount = parseFloat(buyAmount);
+
+    if (isNaN(investAmount) || investAmount <= 0) {
+      triggerAlert('error', t.enterAmount);
+      return;
+    }
+
+    if (investAmount > currentUser.usdtBalance) {
+      triggerAlert('error', t.insufficientBalance);
+      return;
+    }
+
+    const pricePerToken = selectedAsset.price;
+    const purchasedShares = Math.floor(investAmount / pricePerToken);
+
+    if (purchasedShares === 0) {
+      triggerAlert('error', lang === 'fa' ? 'مبلغ سرمایه‌گذاری برای خرید حتی یک سهم کافی نیست!' : 'Investment amount is too low for a single share!');
+      return;
+    }
+
+    // Deduct Balance
+    const cost = purchasedShares * pricePerToken;
+    const fee = cost * 0.001;
+    const totalDeduction = cost + fee;
+
+    if (totalDeduction > currentUser.usdtBalance) {
+      triggerAlert('error', t.insufficientBalance);
+      return;
+    }
+
+    // Update User USDT Balance
+    setCurrentUser(prev => ({
+      ...prev,
+      usdtBalance: parseFloat((prev.usdtBalance - totalDeduction).toFixed(2))
+    }));
+
+    // Update Portfolio
+    setMyPortfolio(prev => {
+      const existing = prev.find(item => item.assetId === selectedAsset.id);
+      if (existing) {
+        const totalShares = existing.shares + purchasedShares;
+        const totalCost = (existing.shares * existing.avgPrice) + cost;
+        const newAvg = parseFloat((totalCost / totalShares).toFixed(4));
+        return prev.map(item => item.assetId === selectedAsset.id ? { ...item, shares: totalShares, avgPrice: newAvg } : item);
+      } else {
+        return [...prev, { assetId: selectedAsset.id, shares: purchasedShares, avgPrice: pricePerToken }];
+      }
+    });
+
+    // Add Transaction
+    const newTx: Transaction = {
+      id: `TX-${Math.floor(1000 + Math.random() * 9000)}`,
+      type: 'buy',
+      asset: selectedAsset.id,
+      amount: `-${totalDeduction.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`,
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      status: 'completed'
+    };
+    setTransactions([newTx, ...transactions]);
+
+    // Add new purchase lot
+    const newLot: PurchaseLot = {
+      id: `LOT-${Math.floor(300 + Math.random() * 699)}`,
+      assetId: selectedAsset.id,
+      shares: purchasedShares,
+      price: pricePerToken,
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+    };
+    setPurchaseLots(prev => [newLot, ...prev]);
+
+    // Update stats slightly to show dynamism
+    setStats(prev => ({
+      ...prev,
+      soldUnits: prev.soldUnits + purchasedShares,
+      tvl: prev.tvl + cost
+    }));
+
+    recordActivity('trade', `Bought ${purchasedShares} shares of #${selectedAsset.id} at ${pricePerToken} USDT`, `خرید ${purchasedShares} سهم از #${selectedAsset.id} با قیمت ${pricePerToken} تتر`);
+
+    setIsBuyModalOpen(false);
+    setBuyAmount('');
+    triggerAlert('success', t.orderExecuted);
+  };
+
+  // Unified modal submission for buying instantly, placing limit/OTC orders, or setting price alerts
+  const handleModalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isLoggedIn || !currentUser) {
+      triggerAlert('error', lang === 'fa' ? 'ابتدا وارد حساب کاربری خود شوید!' : 'Please sign in first!');
+      return;
+    }
+    if (!selectedAsset) return;
+
+    if (buyModalTab === 'instant') {
+      handleBuySubmit(e);
+    } else if (buyModalTab === 'limit') {
+      const targetP = parseFloat(buyLimitPrice);
+      const sharesQty = parseFloat(buyLimitShares);
+      if (isNaN(targetP) || targetP <= 0 || isNaN(sharesQty) || sharesQty <= 0) {
+        triggerAlert('error', lang === 'fa' ? 'مقادیر وارد شده معتبر نیستند!' : 'Invalid inputs provided!');
+        return;
+      }
+      const totalCost = targetP * sharesQty;
+      if (totalCost > currentUser.usdtBalance) {
+        triggerAlert('error', t.insufficientBalance);
+        return;
+      }
+
+      // deduct balance
+      setCurrentUser(prev => prev ? { ...prev, usdtBalance: parseFloat((prev.usdtBalance - totalCost).toFixed(2)) } : null);
+
+      // add limit order
+      const newOrd: LimitOrder = {
+        id: `ORD-${Math.floor(500 + Math.random() * 500)}`,
+        assetId: selectedAsset.id,
+        type: 'buy',
+        price: targetP,
+        amount: sharesQty,
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        status: 'pending'
+      };
+
+      setLimitOrders(prev => [newOrd, ...prev]);
+
+      // log activity
+      recordActivity('order_create',
+        `Created buy limit order ${newOrd.id} for #${selectedAsset.id} of ${sharesQty} shares at ${targetP} USDT`,
+        `ثبت سفارش خرید محدود ${newOrd.id} برای #${selectedAsset.id} به تعداد ${sharesQty} سهم روی قیمت ${targetP} تتر`
+      );
+
+      // notify
+      triggerAlert('success', lang === 'fa'
+        ? 'سفارش محدود / OTC با موفقیت ثبت شد!'
+        : 'OTC / Limit buy order registered successfully!'
+      );
+
+      setIsBuyModalOpen(false);
+      setBuyLimitPrice('');
+      setBuyLimitShares('');
+    } else if (buyModalTab === 'alert') {
+      const targetP = parseFloat(buyAlertPrice);
+      if (isNaN(targetP) || targetP <= 0) {
+        triggerAlert('error', lang === 'fa' ? 'قیمت هدف وارد شده معتبر نیست!' : 'Invalid target price!');
+        return;
+      }
+
+      const newAlert: PriceAlert = {
+        id: `ALT-${Math.floor(800 + Math.random() * 200)}`,
+        assetId: selectedAsset.id,
+        targetPrice: targetP,
+        condition: buyAlertCondition,
+        isTriggered: false,
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16)
+      };
+
+      setPriceAlerts(prev => [newAlert, ...prev]);
+
+      // log activity
+      recordActivity('alert_create',
+        `Set price alert for #${selectedAsset.id} when price goes ${buyAlertCondition} ${targetP} USDT`,
+        `تنظیم هشدار قیمت برای #${selectedAsset.id} در صورت حرکت ${buyAlertCondition === 'above' ? 'بالای' : 'پایین'} ${targetP} تتر`
+      );
+
+      // notify
+      triggerAlert('success', lang === 'fa'
+        ? 'هشدار قیمت با موفقیت ثبت شد!'
+        : 'Price alert set successfully!'
+      );
+
+      setIsBuyModalOpen(false);
+      setBuyAlertPrice('');
+    }
+  };
+
+  // Sell Order Exec
+  const handleSellSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAsset) return;
+    const sharesToSellVal = parseInt(sellShares);
+
+    const ownedItem = myPortfolio.find(p => p.assetId === selectedAsset.id);
+    const maxShares = ownedItem ? ownedItem.shares : 0;
+
+    if (isNaN(sharesToSellVal) || sharesToSellVal <= 0) {
+      triggerAlert('error', t.enterAmount);
+      return;
+    }
+
+    if (sharesToSellVal > maxShares) {
+      triggerAlert('error', t.insufficientShares);
+      return;
+    }
+
+    const revenue = sharesToSellVal * selectedAsset.price;
+    const fee = revenue * 0.001;
+    const netRevenue = revenue - fee;
+
+    // Update User Balance
+    setCurrentUser(prev => ({
+      ...prev,
+      usdtBalance: parseFloat((prev.usdtBalance + netRevenue).toFixed(2))
+    }));
+
+    // Update Portfolio
+    setMyPortfolio(prev => {
+      return prev.map(item => {
+        if (item.assetId === selectedAsset.id) {
+          return { ...item, shares: item.shares - sharesToSellVal };
+        }
+        return item;
+      }).filter(item => item.shares > 0);
+    });
+
+    // Add Transaction
+    const newTx: Transaction = {
+      id: `TX-${Math.floor(1000 + Math.random() * 9000)}`,
+      type: 'sell',
+      asset: selectedAsset.id,
+      amount: `+${netRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`,
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      status: 'completed'
+    };
+    setTransactions([newTx, ...transactions]);
+
+    // Update Purchase Lots (FIFO)
+    setPurchaseLots(prev => {
+      let remainingToSell = sharesToSellVal;
+      const assetLots = prev.filter(lot => lot.assetId === selectedAsset.id);
+      const otherLots = prev.filter(lot => lot.assetId !== selectedAsset.id);
+      
+      const sortedAssetLots = [...assetLots].sort((a, b) => a.date.localeCompare(b.date));
+      const updatedAssetLots: PurchaseLot[] = [];
+      
+      for (const lot of sortedAssetLots) {
+        if (remainingToSell <= 0) {
+          updatedAssetLots.push(lot);
+        } else if (lot.shares <= remainingToSell) {
+          remainingToSell -= lot.shares;
+        } else {
+          updatedAssetLots.push({ ...lot, shares: lot.shares - remainingToSell });
+          remainingToSell = 0;
+        }
+      }
+      return [...otherLots, ...updatedAssetLots];
+    });
+
+    recordActivity('trade', `Sold ${sharesToSellVal} shares of #${selectedAsset.id} at ${selectedAsset.price} USDT`, `فروش ${sharesToSellVal} سهم از #${selectedAsset.id} با قیمت ${selectedAsset.price} تتر`);
+
+    setIsSellModalOpen(false);
+    setSellShares('');
+    triggerAlert('success', t.orderExecuted);
+  };
+
+  // Validation for TxID Hash pattern based on network
+  const validateTxid = (txid: string, network: 'trc20' | 'erc20' | 'bep20') => {
+    const clean = txid.trim();
+    if (!clean) {
+      return {
+        valid: false,
+        msg: lang === 'fa' ? 'لطفاً کد هش تراکنش (TxID) را وارد کنید!' : 'Please enter the transaction hash (TxID)!'
+      };
+    }
+
+    if (network === 'trc20') {
+      // TRC20 (TRON) TxID is 64 hexadecimal characters (optionally 0x prefix accepted)
+      const trc20Regex = /^(0x)?[0-9a-fA-F]{64}$/;
+      if (!trc20Regex.test(clean)) {
+        return {
+          valid: false,
+          msg: lang === 'fa'
+            ? 'فرمت هش تراکنش روی شبکه TRC20 (ترون) نامعتبر است. کد هش باید ۶۴ کاراکتر هگزادسیپمال باشد.'
+            : 'Invalid TRC20 transaction hash. TRON TxID must be a 64-character hexadecimal string.'
+        };
+      }
+    } else if (network === 'erc20') {
+      // ERC20 (Ethereum) TxID starts with 0x followed by 64 hex characters (or 64 hex characters)
+      const erc20Regex = /^(0x)?[0-9a-fA-F]{64}$/;
+      if (!erc20Regex.test(clean)) {
+        return {
+          valid: false,
+          msg: lang === 'fa'
+            ? 'فرمت هش تراکنش روی شبکه ERC20 (اتریوم) نامعتبر است. کد هش باید با 0x شروع شده و ۶۴ کاراکتر هگزادسیپمال داشته باشد.'
+            : 'Invalid ERC20 transaction hash. Ethereum TxID must start with 0x followed by 64 hex characters.'
+        };
+      }
+    } else if (network === 'bep20') {
+      // BEP20 (BSC) TxID starts with 0x followed by 64 hex characters (or 64 hex characters)
+      const bep20Regex = /^(0x)?[0-9a-fA-F]{64}$/;
+      if (!bep20Regex.test(clean)) {
+        return {
+          valid: false,
+          msg: lang === 'fa'
+            ? 'فرمت هش تراکنش روی شبکه BEP20 (بایننس اسمارت چین) نامعتبر است. کد هش باید با 0x شروع شده و ۶۴ کاراکتر هگزادسیپمال داشته باشد.'
+            : 'Invalid BEP20 transaction hash. BSC TxID must start with 0x followed by 64 hex characters.'
+        };
+      }
+    }
+
+    return { valid: true, msg: '' };
+  };
+
+  // Validation for Destination Wallet Address based on network
+  const validateWithdrawAddress = (address: string, network: 'trc20' | 'erc20' | 'bep20') => {
+    const clean = address.trim();
+    if (!clean) {
+      return {
+        valid: false,
+        msg: lang === 'fa' ? 'لطفاً آدرس کیف پول مقصد را وارد کنید!' : 'Please enter destination wallet address!'
+      };
+    }
+
+    if (network === 'trc20') {
+      // TRON address starts with 'T' and is 34 characters (base58)
+      const tronRegex = /^T[a-zA-HJ-NP-Z1-9]{33}$/;
+      if (!tronRegex.test(clean)) {
+        return {
+          valid: false,
+          msg: lang === 'fa'
+            ? 'آدرس مقصد با الگوی شبکه TRC20 مطابقت ندارد. آدرس ترون باید با حرف T شروع شده و ۳۴ کاراکتر باشد.'
+            : 'Invalid TRC20 address. TRON wallet addresses must start with "T" and be 34 characters long.'
+        };
+      }
+    } else if (network === 'erc20' || network === 'bep20') {
+      // EVM address starts with 0x followed by 40 hex characters
+      const evmRegex = /^0x[0-9a-fA-F]{40}$/;
+      if (!evmRegex.test(clean)) {
+        const netLabel = network === 'erc20' ? 'ERC20 (اتریوم)' : 'BEP20 (بایننس اسمارت چین)';
+        const netLabelEn = network === 'erc20' ? 'ERC20' : 'BEP20';
+        return {
+          valid: false,
+          msg: lang === 'fa'
+            ? `آدرس مقصد با الگوی شبکه ${netLabel} مطابقت ندارد. آدرس باید با 0x شروع شده و ۴۲ کاراکتر باشد.`
+            : `Invalid ${netLabelEn} address. EVM wallet addresses must start with "0x" and be 42 characters long.`
+        };
+      }
+    }
+
+    return { valid: true, msg: '' };
+  };
+
+  // Submit Deposit Hash
+  const handleDepositSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setTxidError('');
+
+    const validation = validateTxid(depositTxid, depositNetwork);
+    if (!validation.valid) {
+      setTxidError(validation.msg);
+      triggerAlert('error', validation.msg);
+      return;
+    }
+
+    // Add dummy pending transaction
+    const amountVal = parseFloat((100 + Math.random() * 9900).toFixed(2));
+    const newTx: Transaction = {
+      id: `TX-${Math.floor(1000 + Math.random() * 9000)}`,
+      type: 'deposit',
+      asset: `USDT (${depositNetwork.toUpperCase()})`,
+      amount: `+${amountVal.toLocaleString()} USDT`,
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      status: 'pending'
+    };
+    setTransactions([newTx, ...transactions]);
+    setDepositTxid('');
+    setTxidError('');
+    triggerAlert('success', t.depositSuccess);
+    recordActivity('deposit', `Submitted deposit hash for USDT (${depositNetwork.toUpperCase()})`, `ثبت کد هش واریز تتر روی شبکه ${depositNetwork.toUpperCase()}`);
+  };
+
+  // Submit Withdraw Request
+  const handleWithdrawSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setWithdrawAddrError('');
+
+    const addrValidation = validateWithdrawAddress(withdrawAddress, depositNetwork);
+    if (!addrValidation.valid) {
+      setWithdrawAddrError(addrValidation.msg);
+      triggerAlert('error', addrValidation.msg);
+      return;
+    }
+
+    const amountVal = parseFloat(withdrawAmount);
+
+    if (isNaN(amountVal) || amountVal < 10) {
+      triggerAlert('error', t.minAmount);
+      return;
+    }
+
+    if (amountVal > currentUser.usdtBalance) {
+      triggerAlert('error', t.insufficientBalance);
+      return;
+    }
+
+    // Deduct user balance
+    setCurrentUser(prev => ({
+      ...prev,
+      usdtBalance: parseFloat((prev.usdtBalance - amountVal).toFixed(2))
+    }));
+
+    // Add pending withdrawal to transaction history
+    const newTx: Transaction = {
+      id: `TX-${Math.floor(1000 + Math.random() * 9000)}`,
+      type: 'withdraw',
+      asset: `USDT (${depositNetwork.toUpperCase()})`,
+      amount: `-${amountVal.toLocaleString()} USDT`,
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      status: 'pending'
+    };
+    setTransactions([newTx, ...transactions]);
+    setWithdrawAddress('');
+    setWithdrawAmount('');
+    setWithdrawAddrError('');
+    triggerAlert('success', t.withdrawSuccess);
+    recordActivity('withdraw', `Requested withdrawal of ${amountVal} USDT to ${withdrawAddress}`, `درخواست برداشت ${amountVal} تتر به آدرس ${withdrawAddress}`);
+  };
+
+  // Submit Support Ticket
+  const handleSupportSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supportText.trim()) return;
+
+    const ticketNumber = Math.floor(1000 + Math.random() * 9000);
+    const feedback = t.ticketSuccess.replace('{num}', `#TKT-${ticketNumber}`);
+    triggerAlert('success', feedback);
+    setSupportText('');
+    recordActivity('ticket', `Submitted a support ticket (#TKT-${ticketNumber})`, `ثبت تیکت پشتیبانی جدید (#TKT-${ticketNumber})`);
+  };
+
+  // Create Limit Order
+  const handleCreateLimitOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    const price = parseFloat(newOrderPrice);
+    const amount = parseFloat(newOrderAmount); // This is the number of shares they want to trade
+
+    if (isNaN(price) || price <= 0 || isNaN(amount) || amount <= 0) {
+      triggerAlert('error', lang === 'fa' ? 'لطفاً قیمت هدف و تعداد سهم معتبر وارد کنید' : 'Please enter valid target price and shares quantity');
+      return;
+    }
+
+    const asset = assets.find(a => a.id === newOrderAssetId);
+    if (!asset) return;
+
+    const orderId = `ORD-${Math.floor(500 + Math.random() * 500)}`;
+
+    if (newOrderType === 'buy') {
+      const totalCost = price * amount;
+      if (totalCost > currentUser.usdtBalance) {
+        triggerAlert('error', t.insufficientBalance);
+        return;
+      }
+
+      // Deduct/Reserve USDT
+      setCurrentUser(prev => ({
+        ...prev,
+        usdtBalance: parseFloat((prev.usdtBalance - totalCost).toFixed(2))
+      }));
+
+      const newOrder: LimitOrder = {
+        id: orderId,
+        assetId: newOrderAssetId,
+        type: 'buy',
+        price,
+        amount,
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        status: 'pending'
+      };
+
+      setLimitOrders(prev => [newOrder, ...prev]);
+      triggerAlert('success', lang === 'fa' ? `سفارش خرید محدود ${orderId} ثبت شد` : `Buy limit order ${orderId} submitted`);
+      recordActivity('order_create', `Created buy limit order ${orderId} for ${amount} shares of #${newOrderAssetId} at ${price} USDT`, `ثبت سفارش خرید محدود ${orderId} برای ${amount} سهم از #${newOrderAssetId} روی قیمت ${price} تتر`);
+    } else {
+      // Sell Limit Order
+      const owned = myPortfolio.find(p => p.assetId === newOrderAssetId);
+      if (!owned || owned.shares < amount) {
+        triggerAlert('error', t.insufficientShares);
+        return;
+      }
+
+      // Deduct shares from portfolio to hold them
+      setMyPortfolio(prev => {
+        return prev.map(p => p.assetId === newOrderAssetId ? { ...p, shares: p.shares - amount } : p).filter(p => p.shares > 0);
+      });
+
+      const newOrder: LimitOrder = {
+        id: orderId,
+        assetId: newOrderAssetId,
+        type: 'sell',
+        price,
+        amount,
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        status: 'pending'
+      };
+
+      setLimitOrders(prev => [newOrder, ...prev]);
+      triggerAlert('success', lang === 'fa' ? `سفارش فروش محدود ${orderId} ثبت شد` : `Sell limit order ${orderId} submitted`);
+      recordActivity('order_create', `Created sell limit order ${orderId} for ${amount} shares of #${newOrderAssetId} at ${price} USDT`, `ثبت سفارش فروش محدود ${orderId} برای ${amount} سهم از #${newOrderAssetId} روی قیمت ${price} تتر`);
+    }
+
+    setNewOrderPrice('');
+    setNewOrderAmount('');
+  };
+
+  const handleCancelLimitOrder = (orderId: string) => {
+    const order = limitOrders.find(o => o.id === orderId);
+    if (!order || order.status !== 'pending') return;
+
+    if (order.type === 'buy') {
+      const refund = order.price * order.amount;
+      setCurrentUser(prev => ({
+        ...prev,
+        usdtBalance: parseFloat((prev.usdtBalance + refund).toFixed(2))
+      }));
+    } else {
+      // Refund shares to portfolio
+      setMyPortfolio(prev => {
+        const existing = prev.find(item => item.assetId === order.assetId);
+        if (existing) {
+          return prev.map(item => item.assetId === order.assetId ? { ...item, shares: item.shares + order.amount } : item);
+        } else {
+          return [...prev, { assetId: order.assetId, shares: order.amount, avgPrice: order.price }];
+        }
+      });
+    }
+
+    setLimitOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'cancelled' } : o));
+    triggerAlert('success', lang === 'fa' ? `سفارش ${orderId} لغو شد` : `Order ${orderId} cancelled`);
+    recordActivity('order_cancel', `Cancelled order ${orderId} for #${order.assetId}`, `لغو سفارش ${orderId} برای #${order.assetId}`);
+  };
+
+  const handleExecuteLimitOrder = (orderId: string) => {
+    const order = limitOrders.find(o => o.id === orderId);
+    if (!order || order.status !== 'pending') return;
+
+    const totalCost = order.price * order.amount;
+
+    if (order.type === 'buy') {
+      // Add shares to portfolio
+      setMyPortfolio(prev => {
+        const existing = prev.find(item => item.assetId === order.assetId);
+        if (existing) {
+          const totalShares = existing.shares + order.amount;
+          const totalCostVal = (existing.shares * existing.avgPrice) + totalCost;
+          const newAvg = parseFloat((totalCostVal / totalShares).toFixed(4));
+          return prev.map(item => item.assetId === order.assetId ? { ...item, shares: totalShares, avgPrice: newAvg } : item);
+        } else {
+          return [...prev, { assetId: order.assetId, shares: order.amount, avgPrice: order.price }];
+        }
+      });
+
+      // Add to transaction history
+      const newTx: Transaction = {
+        id: `TX-${Math.floor(1000 + Math.random() * 9000)}`,
+        type: 'buy',
+        asset: order.assetId,
+        amount: `-${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`,
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        status: 'completed'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+
+      // Add purchase lot
+      const newLot: PurchaseLot = {
+        id: `LOT-${Math.floor(300 + Math.random() * 699)}`,
+        assetId: order.assetId,
+        shares: order.amount,
+        price: order.price,
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      };
+      setPurchaseLots(prev => [newLot, ...prev]);
+    } else {
+      // Add USDT revenue to balance
+      const revenue = order.price * order.amount;
+      setCurrentUser(prev => ({
+        ...prev,
+        usdtBalance: parseFloat((prev.usdtBalance + revenue).toFixed(2))
+      }));
+
+      // Add to transaction history
+      const newTx: Transaction = {
+        id: `TX-${Math.floor(1000 + Math.random() * 9000)}`,
+        type: 'sell',
+        asset: order.assetId,
+        amount: `+${revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`,
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        status: 'completed'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+
+      // Update Purchase Lots (FIFO)
+      setPurchaseLots(prev => {
+        let remainingToSell = order.amount;
+        const assetLots = prev.filter(lot => lot.assetId === order.assetId);
+        const otherLots = prev.filter(lot => lot.assetId !== order.assetId);
+        
+        const sortedAssetLots = [...assetLots].sort((a, b) => a.date.localeCompare(b.date));
+        const updatedAssetLots: PurchaseLot[] = [];
+        
+        for (const lot of sortedAssetLots) {
+          if (remainingToSell <= 0) {
+            updatedAssetLots.push(lot);
+          } else if (lot.shares <= remainingToSell) {
+            remainingToSell -= lot.shares;
+          } else {
+            updatedAssetLots.push({ ...lot, shares: lot.shares - remainingToSell });
+            remainingToSell = 0;
+          }
+        }
+        return [...otherLots, ...updatedAssetLots];
+      });
+    }
+
+    setLimitOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'executed' } : o));
+    triggerAlert('success', lang === 'fa' ? `سفارش ${orderId} با موفقیت اجرا شد!` : `Order ${orderId} executed successfully!`);
+    recordActivity('trade', `Executed limit order ${orderId} for #${order.assetId}`, `اجرای سفارش محدود ${orderId} برای #${order.assetId}`);
+  };
+
+  // Copy Referral Code
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText('REF-ASSET-7729');
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  // Calculations for active modals
+  const activeOwnedItem = selectedAsset ? myPortfolio.find(p => p.assetId === selectedAsset.id) : null;
+  const activeMaxShares = activeOwnedItem ? activeOwnedItem.shares : 0;
+
+  // Live total balance calculation: Free USDT + Value of all owned shares
+  const totalSharesValue = myPortfolio.reduce((acc, curr) => {
+    const asset = assets.find(a => a.id === curr.assetId);
+    return acc + (asset ? asset.price * curr.shares : 0);
+  }, 0);
+  const totalBalanceCalculated = currentUser.usdtBalance + totalSharesValue;
+
+  // Live PnL calculation based on current prices and original average prices
+  const totalPnLCalculated = myPortfolio.reduce((acc, curr) => {
+    const asset = assets.find(a => a.id === curr.assetId);
+    return acc + (asset ? (asset.price - curr.avgPrice) * curr.shares : 0);
+  }, 0);
+  const totalPnLPctCalculated = totalPnLCalculated !== 0 ? (totalPnLCalculated / (totalBalanceCalculated - totalPnLCalculated)) * 100 : 0;
+
+  // Filter & Search logic for marketplace
+  const filteredAssets = assets.filter(asset => {
+    const matchesCategory = marketFilter === 'all' || asset.category === marketFilter;
+    const searchString = searchQuery.trim().toLowerCase();
+    const matchesSearch = !searchString || 
+      asset.id.toLowerCase().includes(searchString) || 
+      asset.enName.toLowerCase().includes(searchString) || 
+      asset.faName.includes(searchString);
+    return matchesCategory && matchesSearch;
+  });
+
+  return (
+    <div className={`min-h-screen flex flex-col justify-between transition-colors duration-300 ${
+      theme === 'dark' ? 'bg-[#020617] text-slate-100' : 'bg-slate-50 text-slate-900'
+    }`} dir={lang === 'fa' ? 'rtl' : 'ltr'}>
+      
+      {/* Alert Banner / Notification Feed */}
+      {alertMessage && (
+        <div className={`fixed bottom-6 right-6 left-6 md:left-auto md:w-96 z-50 p-4 rounded-xl shadow-2xl flex items-center gap-3 animate-bounce border ${
+          alertMessage.type === 'success' 
+            ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/50' 
+            : 'bg-rose-950/90 text-rose-200 border-rose-500/50'
+        } backdrop-blur-md`}>
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+            alertMessage.type === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+          }`}>
+            {alertMessage.type === 'success' ? <CheckCircle size={20} /> : <Info size={20} />}
+          </div>
+          <div className="flex-1 text-sm font-medium">
+            {alertMessage.text}
+          </div>
+          <button onClick={() => setAlertMessage(null)} className="text-slate-400 hover:text-white">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Header / Navbar */}
+      <nav className={`sticky top-0 z-40 px-4 md:px-8 h-16 flex items-center justify-between border-b transition-colors duration-300 ${
+        theme === 'dark' ? 'border-slate-800/80 bg-slate-950/80' : 'border-slate-200 bg-white/90'
+      } backdrop-blur-md`}>
+        <div className="flex items-center gap-4 md:gap-8">
+          {/* Mobile Menu Toggle (on the far left for mobile screens) */}
+          <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className={`p-2 rounded-xl border lg:hidden cursor-pointer z-50 ${
+              theme === 'dark' ? 'border-slate-800 bg-slate-900 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700'
+            }`}
+          >
+            {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+
+          {/* Logo */}
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentTab(isLoggedIn ? 'portfolio' : 'home')}>
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/30">
+              <Coins size={18} />
+            </div>
+            <span className={`text-xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              {t.appName}
+            </span>
+          </div>
+
+          {/* Desktop Nav Tabs */}
+          <div className="hidden lg:flex items-center gap-6 text-sm font-semibold">
+            {!isLoggedIn && (
+              <button 
+                onClick={() => setCurrentTab('home')}
+                className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                  currentTab === 'home' 
+                    ? 'border-blue-500 text-blue-500 font-extrabold' 
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {t.home}
+              </button>
+            )}
+            <button 
+              onClick={() => setCurrentTab('market')}
+              className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                currentTab === 'market' 
+                  ? 'border-blue-500 text-blue-500 font-extrabold' 
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {t.assetsMarket}
+            </button>
+
+            {isLoggedIn && (
+              <>
+                <button 
+                  onClick={() => setCurrentTab('portfolio')}
+                  className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                    currentTab === 'portfolio' 
+                      ? 'border-blue-500 text-blue-500 font-extrabold' 
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {t.portfolio}
+                </button>
+                <button 
+                  onClick={() => setCurrentTab('wallet')}
+                  className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                    currentTab === 'wallet' 
+                      ? 'border-blue-500 text-blue-500 font-extrabold' 
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {t.wallet}
+                </button>
+                <button 
+                  onClick={() => setCurrentTab('history')}
+                  className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                    currentTab === 'history' 
+                      ? 'border-blue-500 text-blue-500 font-extrabold' 
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {t.history}
+                </button>
+              </>
+            )}
+
+            <button 
+              onClick={() => setCurrentTab('about')}
+              className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                currentTab === 'about' 
+                  ? 'border-blue-500 text-blue-500 font-extrabold' 
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {t.aboutUs}
+            </button>
+            <button 
+              onClick={() => setCurrentTab('contact')}
+              className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                currentTab === 'contact' 
+                  ? 'border-blue-500 text-blue-500 font-extrabold' 
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {t.contactUs}
+            </button>
+          </div>
+        </div>
+
+        {/* Right Controls */}
+        <div className="flex items-center gap-2 md:gap-3" dir="ltr">
+          
+          {/* Theme Switch (Hidden on mobile, accessible in drawer) */}
+          <button 
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className={`hidden lg:flex h-10 w-10 items-center justify-center rounded-xl border hover:opacity-80 transition-all cursor-pointer ${
+              theme === 'dark' ? 'border-slate-800 bg-slate-900 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700'
+            }`}
+            title={theme === 'dark' ? t.lightMode : t.darkMode}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+
+          {/* Language Switch (Hidden on mobile, accessible in drawer) */}
+          <button 
+            onClick={() => setLang(lang === 'fa' ? 'en' : 'fa')}
+            className={`hidden lg:flex h-10 px-4 text-xs font-black rounded-xl border hover:opacity-80 transition-all items-center justify-center gap-1.5 cursor-pointer ${
+              theme === 'dark' ? 'border-slate-800 bg-slate-900 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700'
+            }`}
+          >
+            <Globe size={13} />
+            <span>{lang === 'fa' ? 'EN' : 'FA'}</span>
+          </button>
+
+          {/* User Section / Login / Wallet Trigger */}
+          {isLoggedIn ? (
+            <div className="relative">
+              <button 
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className={`h-10 flex items-center justify-center gap-2 px-4 text-xs font-black rounded-xl border hover:opacity-90 transition-all cursor-pointer ${
+                  theme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-slate-100 border-slate-200 text-slate-800'
+                }`}
+              >
+                <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs">
+                  <User size={12} />
+                </div>
+                <span className="max-w-[80px] truncate">{currentUser.username}</span>
+                <span className="text-[10px] opacity-60">▾</span>
+              </button>
+
+              {/* User Dropdown */}
+              {isDropdownOpen && (
+                <div className={`absolute right-0 mt-2 w-56 rounded-2xl border shadow-2xl z-50 overflow-hidden ${
+                  theme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                }`}>
+                  <div className={`p-4 border-b ${theme === 'dark' ? 'border-slate-800' : 'border-slate-100'}`}>
+                    <p className="text-xs opacity-60 truncate">{currentUser.email}</p>
+                    <p className="text-sm font-bold mt-1 text-blue-500">
+                      {currentUser.usdtBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT
+                    </p>
+                  </div>
+                  <div className="p-2 space-y-1">
+                    <button 
+                      onClick={() => { setCurrentTab('portfolio'); setIsDropdownOpen(false); }}
+                      className={`w-full text-start px-3 py-2.5 text-xs font-semibold rounded-xl transition-all hover:bg-blue-600/10 hover:text-blue-500 ${
+                        currentTab === 'portfolio' ? 'bg-blue-600/10 text-blue-500' : ''
+                      }`}
+                    >
+                      {t.myPortfolio}
+                    </button>
+                    <button 
+                      onClick={() => { setCurrentTab('wallet'); setIsDropdownOpen(false); }}
+                      className={`w-full text-start px-3 py-2.5 text-xs font-semibold rounded-xl transition-all hover:bg-blue-600/10 hover:text-blue-500 ${
+                        currentTab === 'wallet' ? 'bg-blue-600/10 text-blue-500' : ''
+                      }`}
+                    >
+                      {t.depositUsdt} / {t.withdrawUsdt}
+                    </button>
+                    <button 
+                      onClick={() => { setCurrentTab('history'); setIsDropdownOpen(false); }}
+                      className={`w-full text-start px-3 py-2.5 text-xs font-semibold rounded-xl transition-all hover:bg-blue-600/10 hover:text-blue-500 ${
+                        currentTab === 'history' ? 'bg-blue-600/10 text-blue-500' : ''
+                      }`}
+                    >
+                      {t.transactionHistory}
+                    </button>
+                    <button 
+                      onClick={() => { setCurrentTab('support'); setIsDropdownOpen(false); }}
+                      className={`w-full text-start px-3 py-2.5 text-xs font-semibold rounded-xl transition-all hover:bg-blue-600/10 hover:text-blue-500 ${
+                        currentTab === 'support' ? 'bg-blue-600/10 text-blue-500' : ''
+                      }`}
+                    >
+                      {t.supportCenter}
+                    </button>
+                    <button 
+                      onClick={handleLogout}
+                      className="w-full text-start px-3 py-2.5 text-xs font-bold text-rose-500 rounded-xl hover:bg-rose-500/10 transition-all"
+                    >
+                      {t.signOut}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="hidden sm:flex items-center gap-2">
+              <button 
+                onClick={() => { setAuthMode('signIn'); setIsAuthModalOpen(true); }}
+                className={`h-10 px-5 rounded-xl text-xs font-black transition-all border flex items-center justify-center cursor-pointer ${
+                  theme === 'dark' 
+                    ? 'border-slate-800 bg-slate-900/60 text-slate-300 hover:bg-slate-800' 
+                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {t.signIn}
+              </button>
+              <button 
+                onClick={() => { setAuthMode('signUp'); setIsAuthModalOpen(true); }}
+                className="h-10 px-5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black transition-all shadow-lg shadow-blue-500/10 flex items-center justify-center cursor-pointer"
+              >
+                {t.signUp}
+              </button>
+            </div>
+          )}
+        </div>
+      </nav>
+
+      {/* Mobile Drawer */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            {/* Backdrop Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 lg:hidden"
+            />
+
+            {/* Sliding Drawer Panel */}
+            <motion.div
+              initial={{ x: lang === 'fa' ? '100%' : '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: lang === 'fa' ? '100%' : '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className={`fixed top-0 bottom-0 ${
+                lang === 'fa' ? 'right-0' : 'left-0'
+              } w-full max-w-[320px] z-50 lg:hidden shadow-2xl flex flex-col justify-between transition-colors duration-300 ${
+                theme === 'dark' 
+                  ? 'bg-slate-950 border-slate-900 text-slate-100' 
+                  : 'bg-white border-slate-200 text-slate-800'
+              }`}
+              dir={lang === 'fa' ? 'rtl' : 'ltr'}
+            >
+              <div className="flex flex-col flex-1 overflow-y-auto">
+                {/* Header inside drawer */}
+                <div className={`p-5 flex items-center justify-between border-b ${
+                  theme === 'dark' ? 'border-slate-900/60' : 'border-slate-100'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white shadow-lg">
+                      <Coins size={16} />
+                    </div>
+                    <span className="font-extrabold text-base tracking-tight">{t.appName}</span>
+                  </div>
+                  <button 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`p-2 rounded-xl border cursor-pointer ${
+                      theme === 'dark' ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-slate-100'
+                    }`}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Profile / Auth section in drawer */}
+                <div className={`p-5 ${
+                  theme === 'dark' ? 'bg-slate-900/40 border-b border-slate-900/60' : 'bg-slate-50 border-b border-slate-100'
+                }`}>
+                  {isLoggedIn ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20">
+                          <User size={18} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-bold text-sm truncate">{currentUser.username}</h4>
+                          <p className="text-[10px] text-slate-400 truncate mt-0.5">{currentUser.email}</p>
+                        </div>
+                      </div>
+                      
+                      <div className={`p-3 rounded-2xl border ${
+                        theme === 'dark' ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'
+                      }`}>
+                        <span className="text-[10px] text-slate-400 block font-semibold">{t.wallet}</span>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-sm font-extrabold text-blue-500">
+                            {currentUser.usdtBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT
+                          </span>
+                          <button 
+                            onClick={() => { setCurrentTab('wallet'); setIsMobileMenuOpen(false); }}
+                            className="text-[10px] bg-blue-600 hover:bg-blue-500 text-white font-extrabold px-2 py-1 rounded-lg transition-all"
+                          >
+                            {lang === 'fa' ? 'واریز' : 'Deposit'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-xs text-slate-400 font-bold leading-relaxed">
+                        {lang === 'fa' ? 'به پلتفرم AssetChain خوش آمدید! برای شروع معامله و دسترسی به کیف پول خود وارد شوید.' : 'Welcome to AssetChain! Log in to begin trading physical assets.'}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button 
+                          onClick={() => { setAuthMode('signIn'); setIsAuthModalOpen(true); setIsMobileMenuOpen(false); }}
+                          className={`py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                            theme === 'dark' 
+                              ? 'border-slate-800 bg-slate-900 text-slate-200' 
+                              : 'border-slate-200 bg-white text-slate-700'
+                          }`}
+                        >
+                          {t.signIn}
+                        </button>
+                        <button 
+                          onClick={() => { setAuthMode('signUp'); setIsAuthModalOpen(true); setIsMobileMenuOpen(false); }}
+                          className="py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/10 cursor-pointer"
+                        >
+                          {t.signUp}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Main Navigation Links */}
+                <div className="p-4 space-y-1">
+                  {[
+                    ...(!isLoggedIn ? [{ tab: 'home', label: t.home, icon: <Coins size={16} /> }] : []),
+                    { tab: 'market', label: t.assetsMarket, icon: <TrendingUp size={16} /> },
+                    ...(isLoggedIn ? [
+                      { tab: 'portfolio', label: t.portfolio, icon: <ShieldCheck size={16} /> },
+                      { tab: 'wallet', label: t.wallet, icon: <Wallet size={16} /> },
+                      { tab: 'history', label: t.history, icon: <History size={16} /> },
+                    ] : []),
+                    { tab: 'about', label: t.aboutUs, icon: <Info size={16} /> },
+                    { tab: 'contact', label: t.contactUs, icon: <MessageSquare size={16} /> },
+                  ].map(item => {
+                    const isActive = currentTab === item.tab;
+                    return (
+                      <button
+                        key={item.tab}
+                        onClick={() => { setCurrentTab(item.tab as any); setIsMobileMenuOpen(false); }}
+                        className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-xs font-bold transition-all border cursor-pointer ${
+                          isActive 
+                            ? 'bg-blue-600/10 border-blue-500/30 text-blue-500' 
+                            : theme === 'dark' 
+                              ? 'bg-transparent border-transparent text-slate-300 hover:bg-slate-900' 
+                              : 'bg-transparent border-transparent text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span className={isActive ? 'text-blue-500' : 'text-slate-400'}>{item.icon}</span>
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Bottom bar inside drawer */}
+              <div className={`p-4 border-t space-y-4 ${
+                theme === 'dark' ? 'border-slate-900 bg-slate-950' : 'border-slate-100 bg-slate-50'
+              }`}>
+                {/* Language / Theme Row */}
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Theme Switcher inside drawer */}
+                  <button 
+                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                    className={`flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                      theme === 'dark' ? 'border-slate-800 bg-slate-900 text-slate-200' : 'border-slate-200 bg-white text-slate-700'
+                    }`}
+                  >
+                    {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                    <span>{theme === 'dark' ? t.lightMode : t.darkMode}</span>
+                  </button>
+
+                  {/* Language Switcher inside drawer */}
+                  <button 
+                    onClick={() => setLang(lang === 'fa' ? 'en' : 'fa')}
+                    className={`flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                      theme === 'dark' ? 'border-slate-800 bg-slate-900 text-slate-200' : 'border-slate-200 bg-white text-slate-700'
+                    }`}
+                  >
+                    <Globe size={13} />
+                    <span>{lang === 'fa' ? 'English' : 'فارسی'}</span>
+                  </button>
+                </div>
+
+                {isLoggedIn && (
+                  <button 
+                    onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-rose-500/15 bg-rose-500/10 text-rose-500 font-bold text-xs hover:bg-rose-500/20 transition-all cursor-pointer"
+                  >
+                    <LogOut size={14} />
+                    <span>{t.signOut}</span>
+                  </button>
+                )}
+
+                <div className="flex justify-between items-center px-1 text-[10px] font-bold text-slate-400">
+                  <span>{t.statusConnected}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                    <span className="text-[10px] text-emerald-500">{lang === 'fa' ? 'برخط' : 'Live'}</span>
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* YieldChart and Top Stats Banner Conditional Swap */}
+      {currentTab !== 'home' && currentTab === 'market' && (
+        <div className="w-full">
+          {/* 1. Marketplace Header & Search with glassmorphism and ambient glow in full-width at the very top of the page */}
+          <div className="max-w-7xl mx-auto px-4 md:px-8 pt-6">
+            <div 
+              className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-3xl border transition-all duration-300 relative overflow-hidden backdrop-blur-md shadow-sm ${
+                theme === 'dark' 
+                  ? 'bg-slate-900/40 border-slate-800/80 hover:border-slate-700/80' 
+                  : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl pointer-events-none"></div>
+              <div className="relative z-10">
+                <h1 className="text-xl font-extrabold tracking-tight">{t.topInvestment}</h1>
+                <p className="text-slate-400 text-xs mt-1">{t.tagline}</p>
+              </div>
+              
+              {/* Premium, Interactive Search Bar */}
+              <div className="relative w-full md:w-80 group z-10" dir={lang === 'fa' ? 'rtl' : 'ltr'}>
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl opacity-0 group-focus-within:opacity-20 blur-md transition-all duration-300 pointer-events-none"></div>
+                <div className={`relative flex items-center h-11 rounded-xl border px-3 transition-all duration-300 ${
+                  theme === 'dark' 
+                    ? 'bg-slate-950/80 border-slate-800 group-focus-within:border-blue-500' 
+                    : 'bg-white border-slate-200 group-focus-within:border-blue-500 shadow-sm'
+                }`}>
+                  <Search className="text-slate-400 transition-colors group-focus-within:text-blue-500 flex-shrink-0" size={18} />
+                  <input 
+                    type="text" 
+                    placeholder={lang === 'fa' ? 'جستجوی هوشمند دارایی...' : 'Smart search assets...'}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className={`w-full bg-transparent border-none outline-none py-2 px-3 text-sm focus:ring-0 focus:outline-none placeholder-slate-400/80 ${
+                      theme === 'dark' ? 'text-white' : 'text-slate-900'
+                    }`}
+                  />
+                  {searchQuery ? (
+                    <button 
+                      onClick={() => setSearchQuery('')}
+                      className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-500/10 transition-all cursor-pointer"
+                    >
+                      <X size={16} />
+                    </button>
+                  ) : (
+                    <div className={`hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono border ${
+                      theme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
+                    }`}>
+                      <span>Ctrl</span>
+                      <span>+</span>
+                      <span>K</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. YieldChart Price Graph directly below the search header */}
+          <div className="max-w-7xl mx-auto px-4 md:px-8 pt-6">
+            <YieldChart theme={theme} lang={lang} />
+          </div>
+
+          {/* 3. Top Stats Banner directly below the YieldChart */}
+          <div className={`px-4 md:px-8 py-6 border-b border-t transition-colors duration-300 mt-6 ${
+            theme === 'dark' ? 'bg-slate-950/40 border-slate-900' : 'bg-slate-100 border-slate-200'
+          }`}>
+            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className={`p-5 rounded-2xl border shadow-sm transition-all hover:scale-[1.01] ${
+                theme === 'dark' ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white border-slate-200'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-400 text-xs font-semibold">{t.statTvl}</span>
+                  <TrendingUp size={16} className="text-emerald-500" />
+                </div>
+                <p className={`text-2xl md:text-3xl font-extrabold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  ${stats.tvl.toLocaleString()}
+                </p>
+                <span className="text-emerald-500 text-xs font-bold mt-1 inline-block">
+                  +14.2% {lang === 'fa' ? 'نسبت به ماه قبل' : 'vs last month'}
+                </span>
+              </div>
+
+              <div className={`p-5 rounded-2xl border shadow-sm transition-all hover:scale-[1.01] ${
+                theme === 'dark' ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white border-slate-200'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-400 text-xs font-semibold">{t.statApy}</span>
+                  <Percent size={16} className="text-blue-500" />
+                </div>
+                <p className={`text-2xl md:text-3xl font-extrabold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  16.45%
+                </p>
+                <span className="text-blue-500 text-xs font-bold mt-1 inline-block italic">
+                  {lang === 'fa' ? 'تضمین شده با دارایی‌های فیزیکی واقعی' : 'Backed by real physical reserves'}
+                </span>
+              </div>
+
+              <div className={`p-5 rounded-2xl border shadow-sm transition-all hover:scale-[1.01] ${
+                theme === 'dark' ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white border-slate-200'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-400 text-xs font-semibold">{t.statSold}</span>
+                  <ShieldCheck size={16} className="text-purple-500" />
+                </div>
+                <p className={`text-2xl md:text-3xl font-extrabold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  {stats.soldUnits.toLocaleString()} <span className="text-sm font-normal text-slate-500">{lang === 'fa' ? 'توکن' : 'Tokens'}</span>
+                </p>
+                <span className="text-purple-500 text-xs font-bold mt-1 inline-block">
+                  {lang === 'fa' ? 'در ۱۵ طبقه دارایی معتبر' : 'Across 15 certified asset classes'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Standard Top Stats Banner for other tabs (not home, market, portfolio, wallet, or history) */}
+      {currentTab !== 'home' && currentTab !== 'market' && currentTab !== 'portfolio' && currentTab !== 'wallet' && currentTab !== 'history' && currentTab !== 'about' && currentTab !== 'contact' && (
+        <div className={`px-4 md:px-8 py-6 border-b transition-colors duration-300 ${
+          theme === 'dark' ? 'bg-slate-950/40 border-slate-900' : 'bg-slate-100 border-slate-200'
+        }`}>
+          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className={`p-5 rounded-2xl border shadow-sm transition-all hover:scale-[1.01] ${
+              theme === 'dark' ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white border-slate-200'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-slate-400 text-xs font-semibold">{t.statTvl}</span>
+                <TrendingUp size={16} className="text-emerald-500" />
+              </div>
+              <p className={`text-2xl md:text-3xl font-extrabold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                ${stats.tvl.toLocaleString()}
+              </p>
+              <span className="text-emerald-500 text-xs font-bold mt-1 inline-block">
+                +14.2% {lang === 'fa' ? 'نسبت به ماه قبل' : 'vs last month'}
+              </span>
+            </div>
+
+            <div className={`p-5 rounded-2xl border shadow-sm transition-all hover:scale-[1.01] ${
+              theme === 'dark' ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white border-slate-200'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-slate-400 text-xs font-semibold">{t.statApy}</span>
+                <Percent size={16} className="text-blue-500" />
+              </div>
+              <p className={`text-2xl md:text-3xl font-extrabold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                16.45%
+              </p>
+              <span className="text-blue-500 text-xs font-bold mt-1 inline-block italic">
+                {lang === 'fa' ? 'تضمین شده با دارایی‌های فیزیکی واقعی' : 'Backed by real physical reserves'}
+              </span>
+            </div>
+
+            <div className={`p-5 rounded-2xl border shadow-sm transition-all hover:scale-[1.01] ${
+              theme === 'dark' ? 'bg-slate-900/60 border-slate-800/80' : 'bg-white border-slate-200'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-slate-400 text-xs font-semibold">{t.statSold}</span>
+                <ShieldCheck size={16} className="text-purple-500" />
+              </div>
+              <p className={`text-2xl md:text-3xl font-extrabold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {stats.soldUnits.toLocaleString()} <span className="text-sm font-normal text-slate-500">{lang === 'fa' ? 'توکن' : 'Tokens'}</span>
+              </p>
+              <span className="text-purple-500 text-xs font-bold mt-1 inline-block">
+                {lang === 'fa' ? 'در ۱۵ طبقه دارایی معتبر' : 'Across 15 certified asset classes'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area - Split into Grid on Large Screens to feel premium */}
+      <div className={`${currentTab === 'home' ? 'w-full' : 'max-w-7xl mx-auto px-4 md:px-8'} py-8 w-full flex-1`}>
+        {currentTab === 'home' ? (
+          <LandingPage 
+            theme={theme}
+            lang={lang}
+            t={t}
+            stats={stats}
+            isLoggedIn={isLoggedIn}
+            onLoginClick={() => { setAuthMode('signIn'); setIsAuthModalOpen(true); }}
+            myPortfolio={myPortfolio}
+            assets={assets}
+            onOpenInfo={handleOpenAssetInfo}
+            onExplore={(category?: string) => {
+              setCurrentTab('market');
+              if (category) {
+                setMarketFilter(category);
+              }
+            }}
+            onSupport={() => {
+              if (!isLoggedIn) {
+                setIsAuthModalOpen(true);
+              } else {
+                setCurrentTab('support');
+              }
+            }}
+          />
+        ) : (
+          <div className="space-y-8">
+            {/* YieldChart has been hoisted above the stats banner, so we don't render it here anymore */}
+
+            {/* Primary Views - Full Width Layout */}
+            <div className="w-full space-y-8">
+              
+              {/* View 1: Marketplace / Asset Listings */}
+              {currentTab === 'market' && (
+                <section className="space-y-6">
+
+                {/* Filter Tags */}
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                  {['all', 'metals', 'auto', 'petro', 'bank', 'real_estate', 'commodities', 'global'].map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setMarketFilter(cat)}
+                      className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                        marketFilter === cat
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : theme === 'dark'
+                            ? 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800'
+                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {cat === 'all' && t.allMarkets}
+                      {cat === 'metals' && t.categoryMetals}
+                      {cat === 'auto' && t.categoryAuto}
+                      {cat === 'petro' && t.categoryPetro}
+                      {cat === 'bank' && t.categoryBank}
+                      {cat === 'real_estate' && t.categoryRealEstate}
+                      {cat === 'commodities' && t.categoryCommodities}
+                      {cat === 'global' && t.categoryGlobal}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Asset Grid */}
+                {filteredAssets.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {filteredAssets.map(asset => (
+                      <div 
+                        key={asset.id} 
+                        className={`group rounded-3xl overflow-hidden border shadow-sm flex flex-col justify-between transition-all duration-300 hover:scale-[1.02] ${
+                          theme === 'dark' 
+                            ? 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:shadow-blue-900/10' 
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-slate-300/40'
+                        }`}
+                      >
+                        {/* Card Cover with Gradient/Flag */}
+                        <div className={`p-5 relative overflow-hidden h-36 flex flex-col justify-between ${
+                          theme === 'dark' ? 'bg-slate-950/40' : 'bg-slate-100/60'
+                        }`}>
+                          {/* Ambient glow decoration */}
+                          <div className="absolute -top-12 -right-12 w-24 h-24 rounded-full bg-blue-500/10 blur-xl"></div>
+                          
+                          <div className="flex items-center justify-between z-10">
+                            {/* Location Badge */}
+                            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+                              theme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-white text-slate-600 border'
+                            }`}>
+                              <img 
+                                src={`https://flagcdn.com/16x12/${asset.flag}.png`} 
+                                alt={asset.flag}
+                                className="rounded-[2px] shadow-sm"
+                                referrerPolicy="no-referrer"
+                              />
+                              <span>{lang === 'fa' ? asset.locationFa : asset.locationEn}</span>
+                            </div>
+
+                            {/* ID badge */}
+                            <span className="text-xs font-mono font-bold text-slate-400">
+                              #{asset.id}
+                            </span>
+                          </div>
+
+                          <div className="z-10">
+                            <h3 className={`text-lg font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                              {lang === 'fa' ? asset.faName : asset.enName}
+                            </h3>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {lang === 'fa' ? 'پشتوانه توزیع‌شده با تضمین فیزیکی' : 'Fully audited physical RWA contract'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Card Info Body */}
+                        <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">{t.tokenPrice}</p>
+                              <p className={`text-xl font-extrabold mt-0.5 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                {asset.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} <span className="text-xs font-semibold text-blue-500">USDT</span>
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold text-end">{t.expectedYield}</p>
+                              <p className={`text-lg font-extrabold mt-0.5 text-end flex items-center justify-end gap-1 ${
+                                asset.change >= 0 ? 'text-emerald-500' : 'text-rose-500'
+                              }`}>
+                                {asset.change >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                                <span>{asset.change >= 0 ? '+' : ''}{asset.change}%</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Progress Line */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs font-medium">
+                              <span className="text-slate-400">{t.saleProgress}</span>
+                              <span className={theme === 'dark' ? 'text-white' : 'text-slate-900'}>{asset.progress}%</span>
+                            </div>
+                            <div className={`h-1.5 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                              <div 
+                                className={`h-full rounded-full bg-blue-500 transition-all duration-1000`}
+                                style={{ width: `${asset.progress}%` }}
+                              ></div>
+                            </div>
+                          </div>
+
+                          {/* TSETMC Bourse Badge/Link if applicable */}
+                          {asset.tsetmcUrl && (
+                            <a
+                              href={asset.tsetmcUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="py-1.5 px-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/25 rounded-xl text-[11px] font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <Globe size={13} className="text-emerald-400" />
+                              <span>{lang === 'fa' ? `اطلاعات بورس TSETMC (${asset.bourseSymbol || asset.faName})` : `TSETMC Stock (${asset.bourseSymbol || asset.id})`}</span>
+                              <ExternalLink size={12} />
+                            </a>
+                          )}
+
+                          {/* Order Trigger & Info Action */}
+                          <div className="pt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <button 
+                              onClick={() => handleOpenAssetInfo(asset)}
+                              className={`py-3 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 border ${
+                                theme === 'dark' 
+                                  ? 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/80 text-slate-200' 
+                                  : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                              }`}
+                            >
+                              <Info size={14} className="text-blue-400 shrink-0" />
+                              <span>{t.assetDetailsBtn}</span>
+                            </button>
+
+                            <button 
+                              onClick={() => {
+                                if (!isLoggedIn) {
+                                  setIsAuthModalOpen(true);
+                                } else {
+                                  setSelectedAsset(asset);
+                                  setBuyAmount('');
+                                  setIsBuyModalOpen(true);
+                                }
+                              }}
+                              className="py-3 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-extrabold transition-all duration-200 cursor-pointer text-center"
+                            >
+                              {t.buyNow}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={`p-12 text-center rounded-2xl border ${
+                    theme === 'dark' ? 'bg-slate-900/40 border-slate-800' : 'bg-slate-100 border-slate-200'
+                  }`}>
+                    <p className="text-slate-400 text-sm">{lang === 'fa' ? 'هیچ دارایی پیدا نشد.' : 'No assets found matching your criteria.'}</p>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* View 2: My Portfolio Details */}
+            {currentTab === 'portfolio' && (
+              <section className="space-y-8">
+                {/* Dashboard Title & Quick Description */}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <h1 className="text-2xl font-extrabold tracking-tight flex items-center gap-2">
+                      <LayoutDashboard size={24} className="text-blue-500" />
+                      {t.myPortfolio}
+                    </h1>
+                    <p className="text-slate-400 text-xs mt-1">
+                      {lang === 'fa' 
+                        ? 'نمای یکپارچه دارایی‌ها، مدیریت سفارشات محدود، سود و زیان کل و گزارش ریز تراکنش‌ها' 
+                        : 'Unified dashboard of your holdings, limit orders, net metrics, and account activities'}
+                    </p>
+                  </div>
+
+                  {/* Chart visibility toggler */}
+                  <button
+                    onClick={() => setShowPortfolioChart(!showPortfolioChart)}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 ${
+                      theme === 'dark'
+                        ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {showPortfolioChart ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {showPortfolioChart 
+                      ? (lang === 'fa' ? 'پنهان‌سازی نمودار عملکرد' : 'Hide Performance Chart') 
+                      : (lang === 'fa' ? 'نمایش نمودار عملکرد' : 'Show Performance Chart')}
+                  </button>
+                </div>
+
+                {/* ─── BENTO-STYLE KPI WIDGETS ─── */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* KPI 1: Net Worth / Portfolio Value */}
+                  <div className={`p-6 rounded-3xl border shadow-md flex flex-col justify-between relative overflow-hidden ${
+                    theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                  }`}>
+                    <div className="absolute -right-6 -bottom-6 w-16 h-16 rounded-full bg-blue-500/5 blur-xl"></div>
+                    <div>
+                      <div className="flex justify-between items-center text-slate-400 text-xs font-semibold">
+                        <span>{t.totalBalance}</span>
+                        <Coins size={14} className="text-blue-500" />
+                      </div>
+                      <h2 className={`text-2xl font-extrabold mt-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                        {totalBalanceCalculated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-semibold text-blue-500">USDT</span>
+                      </h2>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-slate-800/10 flex justify-between text-[10px] text-slate-500">
+                      <span>{lang === 'fa' ? 'اعتبار نقدی:' : 'Free USDT:'} <strong className="text-slate-400 font-bold">{currentUser.usdtBalance.toLocaleString()} USDT</strong></span>
+                      <span>{lang === 'fa' ? 'دارایی‌های دیجیتال:' : 'Assets Val:'} <strong className="text-slate-400 font-bold">{totalSharesValue.toLocaleString()} USDT</strong></span>
+                    </div>
+                  </div>
+
+                  {/* KPI 2: Absolute & Percent Net P&L */}
+                  <div className={`p-6 rounded-3xl border shadow-md flex flex-col justify-between relative overflow-hidden ${
+                    theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                  }`}>
+                    <div className="absolute -right-6 -bottom-6 w-16 h-16 rounded-full bg-emerald-500/5 blur-xl"></div>
+                    <div>
+                      <div className="flex justify-between items-center text-slate-400 text-xs font-semibold">
+                        <span>{t.totalPnl}</span>
+                        <TrendingUp size={14} className={totalPnLCalculated >= 0 ? 'text-emerald-500' : 'text-rose-500'} />
+                      </div>
+                      <h2 className={`text-2xl font-extrabold mt-2 flex items-center gap-1 ${
+                        totalPnLCalculated >= 0 ? 'text-emerald-500' : 'text-rose-500'
+                      }`}>
+                        {totalPnLCalculated >= 0 ? '+' : ''}
+                        {totalPnLCalculated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <span className="text-xs font-semibold">USDT</span>
+                      </h2>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-slate-800/10 flex justify-between items-center text-[10px]">
+                      <span className="text-slate-500">{lang === 'fa' ? 'کل سود ناخالص:' : 'Net ROI (Month):'}</span>
+                      <span className={`font-extrabold px-1.5 py-0.5 rounded-md ${
+                        totalPnLCalculated >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
+                      }`}>
+                        {totalPnLCalculated >= 0 ? '+' : ''}{totalPnLPctCalculated.toFixed(2)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* KPI 3: Locked/Pending Capital & Positions */}
+                  <div className={`p-6 rounded-3xl border shadow-md flex flex-col justify-between relative overflow-hidden ${
+                    theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                  }`}>
+                    <div className="absolute -right-6 -bottom-6 w-16 h-16 rounded-full bg-purple-500/5 blur-xl"></div>
+                    <div>
+                      <div className="flex justify-between items-center text-slate-400 text-xs font-semibold">
+                        <span>{lang === 'fa' ? 'سفارشات معلق و اعتبارات مسدود' : 'Pending Orders & Holds'}</span>
+                        <Clock size={14} className="text-purple-500" />
+                      </div>
+                      <h2 className={`text-2xl font-extrabold mt-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                        {limitOrders.filter(o => o.status === 'pending').length} <span className="text-xs font-semibold text-purple-500">{lang === 'fa' ? 'سفارش فعال' : 'Active Orders'}</span>
+                      </h2>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-slate-800/10 flex justify-between text-[10px] text-slate-500">
+                      <span>
+                        {lang === 'fa' ? 'تتر مسدود شده:' : 'Locked USDT:'} 
+                        <strong className="text-slate-400 font-bold ml-1">
+                          {limitOrders.filter(o => o.status === 'pending' && o.type === 'buy').reduce((acc, curr) => acc + (curr.price * curr.amount), 0).toLocaleString()} USDT
+                        </strong>
+                      </span>
+                      <span>
+                        {lang === 'fa' ? 'دارایی‌های مسدود:' : 'Locked Shares:'} 
+                        <strong className="text-slate-400 font-bold ml-1">
+                          {limitOrders.filter(o => o.status === 'pending' && o.type === 'sell').reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()} Shrs
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Collapsible Performance Yield Chart */}
+                <AnimatePresence>
+                  {showPortfolioChart && (
+                    <motion.div 
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="overflow-hidden w-full"
+                    >
+                      <YieldChart 
+                        theme={theme} 
+                        lang={lang} 
+                        isPortfolioMode={true} 
+                        isLoggedIn={isLoggedIn} 
+                        onLoginClick={() => { setAuthMode('signIn'); setIsAuthModalOpen(true); }}
+                        myPortfolio={myPortfolio}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* ─── NEW STACKED FULL-WIDTH LAYOUT ─── */}
+                <div className="space-y-8">
+                  
+                  {/* Panel 1: Your Active Digital Holdings (Full Width) */}
+                  <div className={`p-6 rounded-3xl border shadow-lg space-y-6 ${
+                    theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                  }`}>
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pb-2 border-b border-slate-800/10">
+                      <div>
+                        <h2 className="text-lg font-extrabold tracking-tight flex items-center gap-2">
+                          <CheckCircle size={18} className="text-blue-500" />
+                          {lang === 'fa' ? 'سبد دارایی‌های تحت مالکیت شما' : 'Your Tokenized Asset Holdings'}
+                        </h2>
+                        <p className="text-slate-400 text-[11px] mt-1">
+                          {lang === 'fa' ? 'رصد ارزش لحظه‌ای، میانگین خرید و سود/زیان هر موقعیت معاملاتی' : 'Monitor live values, average costs, and custom P&L of your owned RWA allocations'}
+                        </p>
+                      </div>
+
+                      {/* View Switch: Aggregated vs Detailed */}
+                      <div className={`flex p-1 rounded-xl shrink-0 ${
+                        theme === 'dark' ? 'bg-slate-950' : 'bg-slate-100'
+                      }`}>
+                        <button
+                          onClick={() => setPortfolioViewMode('aggregated')}
+                          className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                            portfolioViewMode === 'aggregated'
+                              ? (theme === 'dark' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-blue-600 shadow-sm')
+                              : 'text-slate-400 hover:text-slate-300'
+                          }`}
+                        >
+                          {lang === 'fa' ? 'نمای کلی دارایی‌ها' : 'Aggregated View'}
+                        </button>
+                        <button
+                          onClick={() => setPortfolioViewMode('detailed')}
+                          className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                            portfolioViewMode === 'detailed'
+                              ? (theme === 'dark' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-blue-600 shadow-sm')
+                              : 'text-slate-400 hover:text-slate-300'
+                          }`}
+                        >
+                          {lang === 'fa' ? 'ریز معاملات و خریدها' : 'Detailed Purchases'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {portfolioViewMode === 'aggregated' ? (
+                      myPortfolio.length > 0 ? (
+                        <div className={`rounded-2xl border overflow-hidden ${
+                          theme === 'dark' ? 'border-slate-800 bg-slate-950/20' : 'border-slate-200 bg-white'
+                        }`}>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-start border-collapse">
+                              <thead>
+                                <tr className={`border-b text-[10px] font-bold uppercase tracking-wider ${
+                                  theme === 'dark' ? 'border-slate-800 text-slate-400 bg-slate-900/20' : 'border-slate-100 text-slate-500 bg-slate-50'
+                                }`}>
+                                  <th className="py-3 px-4 text-start">{lang === 'fa' ? 'دارایی / نماد' : 'Asset / Symbol'}</th>
+                                  <th className="py-3 px-4 text-center">{lang === 'fa' ? 'موجودی (سهم)' : 'Qty Owned'}</th>
+                                  <th className="py-3 px-4 text-end">{lang === 'fa' ? 'قیمت خرید / قیمت فعلی' : 'Avg Buy / Live Price'}</th>
+                                  <th className="py-3 px-4 text-end">{lang === 'fa' ? 'ارزش بازار (USDT)' : 'Market Value'}</th>
+                                  <th className="py-3 px-4 text-end">{lang === 'fa' ? 'سود / زیان (P&L)' : 'Unrealized P&L'}</th>
+                                  <th className="py-3 px-4 text-center">{lang === 'fa' ? 'عملیات سریع' : 'Quick Actions'}</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800/10 text-xs font-semibold">
+                                {myPortfolio.map(item => {
+                                  const asset = assets.find(a => a.id === item.assetId);
+                                  if (!asset) return null;
+
+                                  const currentVal = item.shares * asset.price;
+                                  const costVal = item.shares * item.avgPrice;
+                                  const itemPnL = currentVal - costVal;
+                                  const itemPnLPct = costVal !== 0 ? (itemPnL / costVal) * 100 : 0;
+
+                                  return (
+                                    <tr key={item.assetId} className="hover:bg-slate-500/5 transition-all">
+                                      <td className="py-3.5 px-4">
+                                        <div className="flex items-center gap-2.5">
+                                          <img 
+                                            src={`https://flagcdn.com/20x15/${asset.flag}.png`} 
+                                            alt={asset.flag}
+                                            className="rounded shadow-xs shrink-0"
+                                            referrerPolicy="no-referrer"
+                                          />
+                                          <div>
+                                            <div className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-950'}`}>
+                                              {lang === 'fa' ? asset.faName : asset.enName}
+                                            </div>
+                                            <div className="text-[9px] font-mono font-bold text-slate-500 mt-0.5">#{asset.id}</div>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="py-3.5 px-4 text-center font-mono">
+                                        <div className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
+                                          {item.shares.toLocaleString()}
+                                        </div>
+                                        <div className="text-[9px] text-slate-500 font-bold">{lang === 'fa' ? 'سهم' : 'Shares'}</div>
+                                      </td>
+                                      <td className="py-3.5 px-4 text-end font-mono">
+                                        <div className={theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>{item.avgPrice.toLocaleString()} USDT</div>
+                                        <div className="text-[9px] text-blue-500 font-bold mt-0.5">{asset.price.toLocaleString()} USDT</div>
+                                      </td>
+                                      <td className="py-3.5 px-4 text-end font-mono">
+                                        <div className={`font-extrabold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                          {currentVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </div>
+                                        <span className="text-[8px] font-semibold text-slate-500">USDT</span>
+                                      </td>
+                                      <td className="py-3.5 px-4 text-end font-mono">
+                                        <div className={`font-extrabold flex items-center justify-end gap-0.5 ${itemPnL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                          {itemPnL >= 0 ? '+' : ''}{itemPnL.toFixed(2)}
+                                        </div>
+                                        <div className={`text-[9.5px] font-bold ${itemPnL >= 0 ? 'text-emerald-500/85' : 'text-rose-500/85'}`}>
+                                          {itemPnL >= 0 ? '+' : ''}{itemPnLPct.toFixed(1)}%
+                                        </div>
+                                      </td>
+                                      <td className="py-3.5 px-4">
+                                        <div className="flex gap-1.5 justify-center">
+                                          <button 
+                                            onClick={() => handleOpenAssetInfo(asset)}
+                                            title={lang === 'fa' ? 'اطلاعات و مشخصات دارایی' : 'Asset Specifications'}
+                                            className="px-2 py-1 bg-slate-500/15 hover:bg-slate-500 hover:text-white text-slate-300 text-[10px] rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center gap-1 border border-slate-500/20"
+                                          >
+                                            <Info size={11} />
+                                            <span>{lang === 'fa' ? 'اطلاعات' : 'Info'}</span>
+                                          </button>
+                                          <button 
+                                            onClick={() => {
+                                              setSelectedAsset(asset);
+                                              setBuyAmount('');
+                                              setIsBuyModalOpen(true);
+                                            }}
+                                            className="px-2 py-1 bg-blue-600/10 hover:bg-blue-600 hover:text-white text-blue-500 text-[10px] rounded-lg font-bold transition-all cursor-pointer"
+                                          >
+                                            {t.buy}
+                                          </button>
+                                          <button 
+                                            onClick={() => {
+                                              setSelectedAsset(asset);
+                                              setSellShares('');
+                                              setIsSellModalOpen(true);
+                                            }}
+                                            className="px-2 py-1 bg-amber-600/10 hover:bg-amber-600 hover:text-white text-amber-500 text-[10px] rounded-lg font-bold transition-all cursor-pointer"
+                                          >
+                                            {t.sell}
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={`p-10 text-center rounded-2xl border ${
+                          theme === 'dark' ? 'bg-slate-900/40 border-slate-800' : 'bg-slate-50 border-slate-200'
+                        }`}>
+                          <p className="text-slate-400 text-xs font-semibold">
+                            {lang === 'fa' ? 'هیچ دارایی در سبد شما ثبت نشده است.' : 'Your portfolio currently has no digital holdings.'}
+                          </p>
+                          <button 
+                            onClick={() => setCurrentTab('market')}
+                            className="mt-4 px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl cursor-pointer transition-all"
+                          >
+                            {lang === 'fa' ? 'مشاهده بازار و اولین خرید' : 'Browse Asset Marketplace'}
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                      purchaseLots.length > 0 ? (
+                        <div className={`rounded-2xl border overflow-hidden ${
+                          theme === 'dark' ? 'border-slate-800 bg-slate-950/20' : 'border-slate-200 bg-white'
+                        }`}>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-start border-collapse">
+                              <thead>
+                                <tr className={`border-b text-[10px] font-bold uppercase tracking-wider ${
+                                  theme === 'dark' ? 'border-slate-800 text-slate-400 bg-slate-900/20' : 'border-slate-100 text-slate-500 bg-slate-50'
+                                }`}>
+                                  <th className="py-3 px-4 text-start">{lang === 'fa' ? 'دارایی / زمان خرید' : 'Asset / Purchase Time'}</th>
+                                  <th className="py-3 px-4 text-center">{lang === 'fa' ? 'حجم خرید' : 'Buy Volume'}</th>
+                                  <th className="py-3 px-4 text-end">{lang === 'fa' ? 'قیمت خرید' : 'Buy Price'}</th>
+                                  <th className="py-3 px-4 text-end">{lang === 'fa' ? 'کل سرمایه (USDT)' : 'Total Invested'}</th>
+                                  <th className="py-3 px-4 text-end">{lang === 'fa' ? 'ارزش فعلی / قیمت فعلی' : 'Current Value / Live'}</th>
+                                  <th className="py-3 px-4 text-end">{lang === 'fa' ? 'بازدهی غیرمحقق شده' : 'Unrealized Return'}</th>
+                                  <th className="py-3 px-4 text-center">{lang === 'fa' ? 'عملیات' : 'Actions'}</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800/10 text-xs font-semibold">
+                                {purchaseLots.map(lot => {
+                                  const asset = assets.find(a => a.id === lot.assetId);
+                                  if (!asset) return null;
+
+                                  const purchaseCost = lot.shares * lot.price;
+                                  const currentVal = lot.shares * asset.price;
+                                  const lotPnL = currentVal - purchaseCost;
+                                  const lotPnLPct = purchaseCost !== 0 ? (lotPnL / purchaseCost) * 100 : 0;
+
+                                  return (
+                                    <tr key={lot.id} className="hover:bg-slate-500/5 transition-all">
+                                      <td className="py-3.5 px-4">
+                                        <div className="flex items-center gap-2.5">
+                                          <img 
+                                            src={`https://flagcdn.com/20x15/${asset.flag}.png`} 
+                                            alt={asset.flag}
+                                            className="rounded shadow-xs shrink-0"
+                                            referrerPolicy="no-referrer"
+                                          />
+                                          <div>
+                                            <div className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-950'}`}>
+                                              {lang === 'fa' ? asset.faName : asset.enName}
+                                            </div>
+                                            <div className="text-[9px] text-slate-500 font-bold mt-0.5">{lot.date}</div>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="py-3.5 px-4 text-center font-mono">
+                                        <div className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
+                                          {lot.shares.toLocaleString()}
+                                        </div>
+                                        <div className="text-[9px] text-slate-500 font-bold">{lang === 'fa' ? 'سهم' : 'Shares'}</div>
+                                      </td>
+                                      <td className="py-3.5 px-4 text-end font-mono">
+                                        <div className={theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
+                                          {lot.price.toLocaleString(undefined, { minimumFractionDigits: lot.price < 1 ? 4 : 2, maximumFractionDigits: lot.price < 1 ? 4 : 2 })} USDT
+                                        </div>
+                                      </td>
+                                      <td className="py-3.5 px-4 text-end font-mono">
+                                        <div className={`font-bold ${theme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
+                                          {purchaseCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </div>
+                                        <span className="text-[8px] font-semibold text-slate-500">USDT</span>
+                                      </td>
+                                      <td className="py-3.5 px-4 text-end font-mono">
+                                        <div className={`font-extrabold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                          {currentVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </div>
+                                        <div className="text-[9px] text-blue-500 font-bold mt-0.5">{asset.price.toLocaleString()} USDT</div>
+                                      </td>
+                                      <td className="py-3.5 px-4 text-end font-mono">
+                                        <div className={`font-extrabold flex items-center justify-end gap-0.5 ${lotPnL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                          {lotPnL >= 0 ? '+' : ''}{lotPnL.toFixed(2)}
+                                        </div>
+                                        <div className={`text-[9.5px] font-bold ${lotPnL >= 0 ? 'text-emerald-500/85' : 'text-rose-500/85'}`}>
+                                          {lotPnL >= 0 ? '+' : ''}{lotPnLPct.toFixed(1)}%
+                                        </div>
+                                      </td>
+                                      <td className="py-3.5 px-4">
+                                        <div className="flex gap-1.5 justify-center">
+                                          <button 
+                                            onClick={() => {
+                                              setSelectedAsset(asset);
+                                              setSellShares(lot.shares.toString());
+                                              setIsSellModalOpen(true);
+                                            }}
+                                            className="px-2 py-1 bg-amber-600/10 hover:bg-amber-600 hover:text-white text-amber-500 text-[10px] rounded-lg font-bold transition-all cursor-pointer"
+                                          >
+                                            {lang === 'fa' ? 'فروش این خرید' : 'Sell Lot'}
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={`p-10 text-center rounded-2xl border ${
+                          theme === 'dark' ? 'bg-slate-900/40 border-slate-800' : 'bg-slate-50 border-slate-200'
+                        }`}>
+                          <p className="text-slate-400 text-xs font-semibold">
+                            {lang === 'fa' ? 'هیچ تراکنش خریدی ثبت نشده است.' : 'No purchase lots found.'}
+                          </p>
+                        </div>
+                      )
+                    )}
+                  </div>
+
+                  {/* Panel 2: Limit Trading Desk (Full Width, under Panel 1) */}
+                  <div className={`p-6 rounded-3xl border shadow-lg space-y-5 ${
+                    theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                  }`}>
+                    <div>
+                      <h2 className="text-base font-extrabold tracking-tight flex items-center gap-2">
+                        <Coins size={18} className="text-blue-500" />
+                        {lang === 'fa' ? 'میز سفارشات محدود' : 'Limit Trading Desk'}
+                      </h2>
+                      <p className="text-slate-400 text-[10px] mt-0.5">
+                        {lang === 'fa' ? 'ثبت سفارش خرید یا فروش با تارگت قیمتی دلخواه شما' : 'Set custom target triggers to execute trades automatically'}
+                      </p>
+                    </div>
+
+                    <form onSubmit={handleCreateLimitOrder} className="space-y-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {/* Select Asset */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase block">
+                            {lang === 'fa' ? 'انتخاب دارایی' : 'Select RWA Asset'}
+                          </label>
+                          <select
+                            value={newOrderAssetId}
+                            onChange={(e) => setNewOrderAssetId(e.target.value)}
+                            className={`w-full p-2.5 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 border ${
+                              theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                            }`}
+                          >
+                            {assets.map(asset => (
+                              <option key={asset.id} value={asset.id}>
+                                {lang === 'fa' ? asset.faName : asset.enName} ({asset.id})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Direction Type Switcher */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase block">
+                            {lang === 'fa' ? 'جهت سفارش معامله' : 'Order Direction'}
+                          </label>
+                          <div className={`flex p-1 rounded-xl ${
+                            theme === 'dark' ? 'bg-slate-955 border border-slate-850' : 'bg-slate-100'
+                          }`}>
+                            <button
+                              type="button"
+                              onClick={() => setNewOrderType('buy')}
+                              className={`flex-1 py-2 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
+                                newOrderType === 'buy'
+                                  ? 'bg-emerald-600 text-white shadow-md'
+                                  : 'text-slate-400 hover:text-slate-600'
+                              }`}
+                            >
+                              {lang === 'fa' ? 'خرید با تارگت' : 'Buy Limit'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setNewOrderType('sell')}
+                              className={`flex-1 py-2 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
+                                newOrderType === 'sell'
+                                  ? 'bg-amber-600 text-white shadow-md'
+                                  : 'text-slate-400 hover:text-slate-600'
+                              }`}
+                            >
+                              {lang === 'fa' ? 'فروش با تارگت' : 'Sell Limit'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Price Input */}
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between items-center text-[10px]">
+                            <label className="text-slate-400 font-bold uppercase">
+                              {lang === 'fa' ? 'قیمت هدف (USDT)' : 'Target Price (USDT)'}
+                            </label>
+                            <span className="text-blue-500 font-bold">
+                              {lang === 'fa' ? 'قیمت فعلی: ' : 'Live: '}
+                              {assets.find(a => a.id === newOrderAssetId)?.price} USDT
+                            </span>
+                          </div>
+                          <input
+                            type="number"
+                            step="0.0001"
+                            placeholder="0.00"
+                            value={newOrderPrice}
+                            onChange={(e) => setNewOrderPrice(e.target.value)}
+                            className={`w-full p-2.5 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 border ${
+                              theme === 'dark' ? 'bg-slate-955 border-slate-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                            }`}
+                            required
+                          />
+                        </div>
+
+                        {/* Quantity (Shares) */}
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between items-center text-[10px]">
+                            <label className="text-slate-400 font-bold uppercase">
+                              {lang === 'fa' ? 'تعداد سهم معامله' : 'Quantity (Shares)'}
+                            </label>
+                            {newOrderType === 'sell' && (
+                              <span className="text-amber-500 font-bold">
+                                {lang === 'fa' ? 'موجودی شما: ' : 'Your shares: '}
+                                {myPortfolio.find(p => p.assetId === newOrderAssetId)?.shares || 0} Shrs
+                              </span>
+                            )}
+                          </div>
+                          <input
+                            type="number"
+                            step="1"
+                            placeholder="0"
+                            value={newOrderAmount}
+                            onChange={(e) => setNewOrderAmount(e.target.value)}
+                            className={`w-full p-2.5 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 border ${
+                              theme === 'dark' ? 'bg-slate-955 border-slate-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                            }`}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Live calculation and Submit button aligned at bottom */}
+                      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-slate-800/10">
+                        {parseFloat(newOrderPrice) > 0 && parseFloat(newOrderAmount) > 0 ? (
+                          <div className="p-3 rounded-2xl bg-blue-500/5 border border-blue-500/10 text-[11px] min-w-[200px] text-center sm:text-start flex items-center justify-between gap-4">
+                            <span className="text-slate-400 font-bold">{lang === 'fa' ? 'ارزش تخمینی سفارش:' : 'Estimated Total:'}</span>
+                            <strong className="text-blue-500 font-extrabold text-sm font-mono">
+                              {(parseFloat(newOrderPrice) * parseFloat(newOrderAmount)).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDT
+                            </strong>
+                          </div>
+                        ) : (
+                          <div className="hidden sm:block" />
+                        )}
+
+                        <button
+                          type="submit"
+                          className={`w-full sm:w-auto px-10 py-3 rounded-2xl text-xs font-extrabold cursor-pointer transition-all duration-200 text-center text-white ${
+                            newOrderType === 'buy'
+                              ? 'bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-900/10'
+                              : 'bg-amber-600 hover:bg-amber-500 shadow-lg shadow-amber-900/10'
+                          }`}
+                        >
+                          {newOrderType === 'buy'
+                            ? (lang === 'fa' ? 'ثبت سفارش خرید هدف' : 'Submit Buy Limit')
+                            : (lang === 'fa' ? 'ثبت سفارش فروش هدف' : 'Submit Sell Limit')}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Panel 3: Pending Orders / Timeline logs (Full Width) */}
+                  <div className={`p-6 rounded-3xl border shadow-lg space-y-6 ${
+                    theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                  }`}>
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-800/10 gap-4">
+                          <div>
+                            <h2 className="text-lg font-extrabold tracking-tight flex items-center gap-2">
+                              <Clock size={18} className="text-blue-500" />
+                              {lang === 'fa' ? 'سفارشات معلق و دفترچه گزارشات' : 'Limit Orders & Activity logs'}
+                            </h2>
+                            <p className="text-slate-400 text-[11px] mt-1">
+                              {lang === 'fa' ? 'رصد سفارشات فعال بازار و تاریخچه تمام تراکنش‌ها و فعالیت‌ها' : 'Review active limit trades or access historical chronological logs'}
+                            </p>
+                          </div>
+
+                          {/* Navigation switches for sub-tabs */}
+                          <div className={`flex p-1 rounded-xl shrink-0 ${
+                            theme === 'dark' ? 'bg-slate-950' : 'bg-slate-100'
+                          }`}>
+                            <button
+                              onClick={() => setPortfolioSubTab('orders')}
+                              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                                portfolioSubTab === 'orders'
+                                  ? (theme === 'dark' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-blue-600 shadow-sm')
+                                  : 'text-slate-400 hover:text-slate-300'
+                              }`}
+                            >
+                              {lang === 'fa' ? 'سفارشات معلق' : 'Pending Orders'}
+                            </button>
+                            <button
+                              onClick={() => setPortfolioSubTab('activity')}
+                              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                                portfolioSubTab === 'activity'
+                                  ? (theme === 'dark' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-blue-600 shadow-sm')
+                                  : 'text-slate-400 hover:text-slate-300'
+                              }`}
+                            >
+                              {lang === 'fa' ? 'دفترچه فعالیت‌ها' : 'Activity Timeline'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {portfolioSubTab === 'orders' ? (
+                          <div className="space-y-4">
+                            {limitOrders.length > 0 ? (
+                              <div className={`rounded-2xl border overflow-hidden ${
+                                theme === 'dark' ? 'border-slate-800 bg-slate-950/20' : 'border-slate-200 bg-white'
+                              }`}>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-start border-collapse">
+                                    <thead>
+                                      <tr className={`border-b text-[10px] font-bold uppercase tracking-wider ${
+                                        theme === 'dark' ? 'border-slate-800 text-slate-400 bg-slate-900/20' : 'border-slate-100 text-slate-500 bg-slate-50'
+                                      }`}>
+                                        <th className="py-3 px-4 text-start">{lang === 'fa' ? 'سفارش / تاریخ' : 'Order ID / Date'}</th>
+                                        <th className="py-3 px-4 text-start">{lang === 'fa' ? 'دارایی / نوع' : 'Asset / Direction'}</th>
+                                        <th className="py-3 px-4 text-end">{lang === 'fa' ? 'قیمت هدف (USDT)' : 'Target Price'}</th>
+                                        <th className="py-3 px-4 text-end">{lang === 'fa' ? 'تعداد سهم' : 'Shares Qty'}</th>
+                                        <th className="py-3 px-4 text-end">{lang === 'fa' ? 'ارزش سفارش' : 'Total Cost'}</th>
+                                        <th className="py-3 px-4 text-center">{lang === 'fa' ? 'وضعیت / عملیات شبیه‌ساز' : 'Status / Simulation'}</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/10 text-xs font-semibold">
+                                      {limitOrders.map(order => {
+                                        const asset = assets.find(a => a.id === order.assetId);
+                                        const orderCost = order.price * order.amount;
+                                        return (
+                                          <tr key={order.id} className="hover:bg-slate-500/5 transition-colors">
+                                            <td className="py-3 px-4">
+                                              <div className="font-mono text-[10.5px] font-bold text-slate-400">
+                                                {order.id}
+                                              </div>
+                                              <div className="text-[9px] text-slate-500 mt-0.5">{order.date}</div>
+                                            </td>
+                                            <td className="py-3 px-4">
+                                              <div className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                                {asset ? (lang === 'fa' ? asset.faName : asset.enName) : order.assetId}
+                                              </div>
+                                              <div className="mt-1">
+                                                <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-extrabold uppercase ${
+                                                  order.type === 'buy'
+                                                    ? 'bg-emerald-500/10 text-emerald-500'
+                                                    : 'bg-amber-500/10 text-amber-500'
+                                                }`}>
+                                                  {order.type === 'buy' ? (lang === 'fa' ? 'خرید محدود' : 'Buy Limit') : (lang === 'fa' ? 'فروش محدود' : 'Sell Limit')}
+                                                </span>
+                                              </div>
+                                            </td>
+                                            <td className="py-3 px-4 text-end font-mono">
+                                              <div className={theme === 'dark' ? 'text-slate-200' : 'text-slate-800'}>{order.price.toLocaleString()} USDT</div>
+                                              <div className="text-[9px] text-slate-500 mt-0.5">{lang === 'fa' ? 'قیمت بازار: ' : 'Live: '}{asset?.price}</div>
+                                            </td>
+                                            <td className="py-3 px-4 text-end font-mono">
+                                              <div className={theme === 'dark' ? 'text-slate-200' : 'text-slate-800'}>
+                                                {order.amount.toLocaleString()}
+                                              </div>
+                                              <span className="text-[9px] text-slate-500">{lang === 'fa' ? 'سهم' : 'Shares'}</span>
+                                            </td>
+                                            <td className="py-3 px-4 text-end font-mono">
+                                              <div className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                                {orderCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                              </div>
+                                              <span className="text-[8px] text-slate-500">USDT</span>
+                                            </td>
+                                            <td className="py-3 px-4">
+                                              <div className="flex flex-col items-center justify-center gap-1.5">
+                                                {order.status === 'pending' ? (
+                                                  <div className="space-y-1.5">
+                                                    <span className="text-[9.5px] bg-slate-500/10 text-slate-400 px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1 justify-center w-full">
+                                                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse"></span>
+                                                      {lang === 'fa' ? 'فعال / در نوبت' : 'Pending'}
+                                                    </span>
+                                                    <div className="flex gap-1 justify-center">
+                                                      <button
+                                                        onClick={() => handleExecuteLimitOrder(order.id)}
+                                                        className="px-2 py-0.5 bg-blue-600/20 hover:bg-blue-600 hover:text-white text-blue-400 text-[9.5px] rounded font-bold transition-all cursor-pointer"
+                                                        title={lang === 'fa' ? 'شبیه‌سازی اجرای فوری سفارش روی این قیمت' : 'Simulate execution of this limit target'}
+                                                      >
+                                                        {lang === 'fa' ? 'اجرای سفارش' : 'Exec'}
+                                                      </button>
+                                                      <button
+                                                        onClick={() => handleCancelLimitOrder(order.id)}
+                                                        className="px-2 py-0.5 bg-rose-600/20 hover:bg-rose-600 hover:text-white text-rose-400 text-[9.5px] rounded font-bold transition-all cursor-pointer"
+                                                      >
+                                                        {lang === 'fa' ? 'لغو سفارش' : 'Cancel'}
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                ) : order.status === 'executed' ? (
+                                                  <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
+                                                    <CheckCircle size={10} />
+                                                    {lang === 'fa' ? 'انجام شده' : 'Executed'}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-[10px] bg-rose-500/10 text-rose-400 px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
+                                                    <X size={10} className="shrink-0" />
+                                                    {lang === 'fa' ? 'لغو شده' : 'Cancelled'}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className={`p-8 text-center rounded-2xl border ${
+                                theme === 'dark' ? 'bg-slate-900/20 border-slate-800' : 'bg-slate-50 border-slate-200'
+                              }`}>
+                                <p className="text-slate-400 text-xs font-semibold">{lang === 'fa' ? 'هیچ سفارش محدودی ثبت نشده است.' : 'No active limit orders found.'}</p>
+                              </div>
+                            )}
+
+                            {/* Price Alerts Section */}
+                            <div className="pt-6 border-t border-slate-800/20">
+                              <div className="flex justify-between items-center mb-4">
+                                <h4 className={`text-xs font-black uppercase tracking-wider ${
+                                  theme === 'dark' ? 'text-white' : 'text-slate-900'
+                                }`}>
+                                  {lang === 'fa' ? '🔔 هشدارهای فعال قیمت' : '🔔 Active Price Alerts'}
+                                </h4>
+                                <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-md font-extrabold">
+                                  {priceAlerts.length} {lang === 'fa' ? 'هشدار تنظیم شده' : 'Alerts Set'}
+                                </span>
+                              </div>
+
+                              {priceAlerts.length > 0 ? (
+                                <div className={`rounded-2xl border overflow-hidden ${
+                                  theme === 'dark' ? 'border-slate-800 bg-slate-950/20' : 'border-slate-200 bg-white'
+                                }`}>
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-start border-collapse">
+                                      <thead>
+                                        <tr className={`border-b text-[10px] font-bold uppercase tracking-wider ${
+                                          theme === 'dark' ? 'border-slate-800 text-slate-400 bg-slate-900/20' : 'border-slate-100 text-slate-500 bg-slate-50'
+                                        }`}>
+                                          <th className="py-3 px-4 text-start">{lang === 'fa' ? 'شناسه هشدار / تاریخ' : 'Alert ID / Date'}</th>
+                                          <th className="py-3 px-4 text-start">{lang === 'fa' ? 'دارایی' : 'Asset'}</th>
+                                          <th className="py-3 px-4 text-end">{lang === 'fa' ? 'شرایط فعال‌سازی' : 'Trigger Condition'}</th>
+                                          <th className="py-3 px-4 text-end">{lang === 'fa' ? 'قیمت هدف (USDT)' : 'Target Price'}</th>
+                                          <th className="py-3 px-4 text-center">{lang === 'fa' ? 'وضعیت / عملیات' : 'Status / Actions'}</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-800/10 text-xs font-semibold">
+                                        {priceAlerts.map(alert => {
+                                          const asset = assets.find(a => a.id === alert.assetId);
+                                          return (
+                                            <tr key={alert.id} className="hover:bg-slate-500/5 transition-colors">
+                                              <td className="py-3 px-4">
+                                                <div className="font-mono text-[10.5px] font-bold text-slate-400">
+                                                  {alert.id}
+                                                </div>
+                                                <div className="text-[9px] text-slate-500 mt-0.5">{alert.date}</div>
+                                              </td>
+                                              <td className="py-3 px-4 font-bold">
+                                                {asset ? (lang === 'fa' ? asset.faName : asset.enName) : alert.assetId}
+                                                <span className="text-[10px] font-mono font-bold text-slate-500 block">#{alert.assetId}</span>
+                                              </td>
+                                              <td className="py-3 px-4 text-end">
+                                                <span className={`text-[9.5px] px-2 py-0.5 rounded font-extrabold uppercase ${
+                                                  alert.condition === 'above' 
+                                                    ? 'bg-blue-500/10 text-blue-400' 
+                                                    : 'bg-amber-500/10 text-amber-500'
+                                                }`}>
+                                                  {alert.condition === 'above' 
+                                                    ? (lang === 'fa' ? 'بالای هدف (>=)' : 'Goes Above (>=)') 
+                                                    : (lang === 'fa' ? 'Goes Below (<=)' : 'Goes Below (<=)')}
+                                                </span>
+                                              </td>
+                                              <td className="py-3 px-4 text-end font-mono">
+                                                <div className={theme === 'dark' ? 'text-slate-200' : 'text-slate-800'}>{alert.targetPrice.toLocaleString()} USDT</div>
+                                                <div className="text-[9px] text-slate-500 mt-0.5">{lang === 'fa' ? 'قیمت بازار: ' : 'Live: '}{asset?.price}</div>
+                                              </td>
+                                              <td className="py-3 px-4">
+                                                <div className="flex flex-col items-center justify-center gap-1.5">
+                                                  {alert.isTriggered ? (
+                                                    <span className="text-[9.5px] bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
+                                                      <CheckCircle size={10} />
+                                                      {lang === 'fa' ? 'ارسال شده' : 'Triggered'}
+                                                    </span>
+                                                  ) : (
+                                                    <div className="flex flex-col items-center gap-1">
+                                                      <span className="text-[9.5px] bg-slate-500/10 text-slate-400 px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                                        {lang === 'fa' ? 'فعال / در انتظار' : 'Watching'}
+                                                      </span>
+                                                      <button
+                                                        onClick={() => {
+                                                          setPriceAlerts(prev => prev.filter(a => a.id !== alert.id));
+                                                          triggerAlert('success', lang === 'fa' ? 'هشدار قیمت لغو شد.' : 'Price alert removed.');
+                                                          recordActivity('alert_cancel', `Cancelled price alert ${alert.id}`, `لغو هشدار قیمت ${alert.id}`);
+                                                        }}
+                                                        className="px-2 py-0.5 bg-rose-600/20 hover:bg-rose-600 hover:text-white text-rose-400 text-[9.5px] rounded font-bold transition-all cursor-pointer"
+                                                      >
+                                                        {lang === 'fa' ? 'حذف' : 'Remove'}
+                                                      </button>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className={`p-8 text-center rounded-2xl border ${
+                                  theme === 'dark' ? 'bg-slate-900/20 border-slate-800' : 'bg-slate-50 border-slate-200'
+                                }`}>
+                                  <p className="text-slate-400 text-xs font-semibold">{lang === 'fa' ? 'هیچ هشدار قیمتی تنظیم نشده است.' : 'No active price alerts found.'}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          /* Timeline of Account Activity Logs */
+                          <div className="space-y-6 max-w-xl mx-auto py-2">
+                            <div className={`relative border-l-2 ml-3 pl-6 space-y-6 ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'}`}>
+                              {activities.map((act) => {
+                                let actIcon = <Clock size={13} className="text-slate-400" />;
+                                let actBg = 'bg-slate-800 border-slate-700';
+                                if (act.type === 'login' || act.type === 'signup') {
+                                  actIcon = <User size={13} className="text-emerald-400" />;
+                                  actBg = theme === 'dark' ? 'bg-emerald-950/60 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200';
+                                } else if (act.type === 'trade') {
+                                  actIcon = <TrendingUp size={13} className="text-blue-400" />;
+                                  actBg = theme === 'dark' ? 'bg-blue-950/60 border-blue-500/30' : 'bg-blue-50 border-blue-200';
+                                } else if (act.type === 'deposit') {
+                                  actIcon = <ArrowDownRight size={13} className="text-emerald-400" />;
+                                  actBg = theme === 'dark' ? 'bg-emerald-950/60 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200';
+                                } else if (act.type === 'withdraw') {
+                                  actIcon = <ArrowUpRight size={13} className="text-rose-400" />;
+                                  actBg = theme === 'dark' ? 'bg-rose-950/60 border-rose-500/30' : 'bg-rose-50 border-rose-200';
+                                } else if (act.type === 'order_create') {
+                                  actIcon = <Coins size={13} className="text-purple-400" />;
+                                  actBg = theme === 'dark' ? 'bg-purple-950/60 border-purple-500/30' : 'bg-purple-50 border-purple-200';
+                                } else if (act.type === 'order_cancel') {
+                                  actIcon = <X size={13} className="text-slate-400" />;
+                                  actBg = theme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200';
+                                } else if (act.type === 'ticket') {
+                                  actIcon = <MessageSquare size={13} className="text-cyan-400" />;
+                                  actBg = theme === 'dark' ? 'bg-cyan-950/60 border-cyan-500/30' : 'bg-cyan-50 border-cyan-200';
+                                }
+
+                                return (
+                                  <div key={act.id} className="relative">
+                                    {/* Absolute Dot icon */}
+                                    <span className={`absolute -left-[35px] top-1.5 flex items-center justify-center w-5.5 h-5.5 rounded-full border shadow-sm ${actBg}`}>
+                                      {actIcon}
+                                    </span>
+
+                                    <div className={`p-4 rounded-2xl border transition-all hover:scale-[1.01] ${
+                                      theme === 'dark' ? 'bg-slate-950/40 border-slate-800/80' : 'bg-slate-50 border-slate-200'
+                                    }`}>
+                                      <div className="flex justify-between items-start gap-4">
+                                        <p className={`text-xs font-bold leading-relaxed ${theme === 'dark' ? 'text-slate-200' : 'text-slate-850'}`}>
+                                          {lang === 'fa' ? act.descriptionFa : act.descriptionEn}
+                                        </p>
+                                        <span className="text-[10px] text-slate-500 shrink-0 font-mono mt-0.5">{act.date}</span>
+                                      </div>
+                                      <div className="flex justify-between items-center mt-2.5">
+                                        <span className={`text-[8.5px] font-extrabold px-2 py-0.5 rounded uppercase ${
+                                          theme === 'dark' ? 'bg-slate-900 text-slate-400' : 'bg-slate-200/60 text-slate-600'
+                                        }`}>
+                                          {act.type}
+                                        </span>
+                                        <span className="text-[8.5px] font-mono text-slate-500 font-bold">ID: {act.id}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                </div>
+              </section>
+            )}
+
+            {/* View 3: Deposit / Withdraw Staking */}
+            {currentTab === 'wallet' && (
+              <section className="space-y-6">
+                <div>
+                  <h1 className="text-2xl font-extrabold tracking-tight">{t.wallet}</h1>
+                  <p className="text-slate-400 text-xs mt-1">{lang === 'fa' ? 'شارژ حساب تتر یا برداشت سریع' : 'Deposit and withdraw USDT securely'}</p>
+                </div>
+
+                <div className={`rounded-3xl border p-6 shadow-sm space-y-6 max-w-xl mx-auto ${
+                  theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                }`}>
+                  {/* Tabs */}
+                  <div className="flex border-b border-slate-800">
+                    <button 
+                      onClick={() => setWalletTab('deposit')}
+                      className={`flex-1 py-3 text-sm font-bold text-center border-b-2 transition-all ${
+                        walletTab === 'deposit' ? 'border-blue-500 text-blue-500 font-extrabold' : 'border-transparent text-slate-400'
+                      }`}
+                    >
+                      {t.depositUsdt}
+                    </button>
+                    <button 
+                      onClick={() => setWalletTab('withdraw')}
+                      className={`flex-1 py-3 text-sm font-bold text-center border-b-2 transition-all ${
+                        walletTab === 'withdraw' ? 'border-blue-500 text-blue-500 font-extrabold' : 'border-transparent text-slate-400'
+                      }`}
+                    >
+                      {t.withdrawUsdt}
+                    </button>
+                  </div>
+
+                  {/* Info Warning Banner */}
+                  <div className={`p-4 rounded-xl flex gap-3 text-xs leading-relaxed border ${
+                    theme === 'dark' ? 'bg-amber-950/20 border-amber-500/30 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800'
+                  }`}>
+                    <Info size={16} className="shrink-0 text-amber-500" />
+                    <span>{t.transactionWarning}</span>
+                  </div>
+
+                  {/* Network Selector */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase">{t.selectNetwork}</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['trc20', 'erc20', 'bep20'].map((net) => (
+                        <button
+                          key={net}
+                          onClick={() => {
+                            setDepositNetwork(net as any);
+                            setTxidError('');
+                            setWithdrawAddrError('');
+                          }}
+                          className={`py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                            depositNetwork === net
+                              ? 'bg-blue-600 text-white border-blue-500'
+                              : theme === 'dark'
+                                ? 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
+                                : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          {net === 'trc20' && 'TRC20'}
+                          {net === 'erc20' && 'ERC20'}
+                          {net === 'bep20' && 'BEP20 (BSC)'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Deposit View */}
+                  {walletTab === 'deposit' && (
+                    <form onSubmit={handleDepositSubmit} className="space-y-4">
+                      {/* Live Deposit Address Box */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">{t.depositAddress}</label>
+                        <div className={`p-4 rounded-xl border text-center break-all font-mono text-sm relative group ${
+                          theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'
+                        }`}>
+                          <span>
+                            {depositNetwork === 'trc20' && 'TUtwXkXYZ123abcTRC20dummyAddressDepositActive'}
+                            {depositNetwork === 'erc20' && '0x123ERC20SecureAddressForAssetChainRWAStore'}
+                            {depositNetwork === 'bep20' && '0x789BEP20SmartChainDepositSecuredEngine'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* TxID hash Input */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-xs font-bold text-slate-400 uppercase">{t.txidLabel}</label>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">
+                            {depositNetwork === 'trc20' && (lang === 'fa' ? 'الگو TRC20: ۶۴ کاراکتر هگز' : 'TRC20: 64 Hex Chars')}
+                            {depositNetwork === 'erc20' && (lang === 'fa' ? 'الگو ERC20: شروع با 0x + ۶۴ کاراکتر' : 'ERC20: 0x + 64 Hex Chars')}
+                            {depositNetwork === 'bep20' && (lang === 'fa' ? 'الگو BEP20: شروع با 0x + ۶۴ کاراکتر' : 'BEP20: 0x + 64 Hex Chars')}
+                          </span>
+                        </div>
+
+                        <div className="relative">
+                          <input 
+                            type="text" 
+                            value={depositTxid}
+                            onChange={(e) => {
+                              setDepositTxid(e.target.value);
+                              if (txidError) setTxidError('');
+                            }}
+                            placeholder={
+                              depositNetwork === 'trc20'
+                                ? (lang === 'fa' ? 'مثال: e4399e5362bf6a9a0891d8e176b97621c8b32034e3e3b0bb3ef52c5a085b3765' : 'e.g., e4399e5362bf6a9a0891d8e176b97621c8b32034e3e3b0bb3ef52c5a085b3765')
+                                : (lang === 'fa' ? 'مثال: 0x7b233a18a9028882b52ec87247d51ee2d7bf8107dd64cf63b9f3ee2bdfa67a03' : 'e.g., 0x7b233a18a9028882b52ec87247d51ee2d7bf8107dd64cf63b9f3ee2bdfa67a03')
+                            }
+                            className={`w-full p-3 font-mono text-xs rounded-xl border focus:outline-none transition-all ${
+                              txidError 
+                                ? 'border-red-500 bg-red-500/5 text-red-200 focus:border-red-500' 
+                                : depositTxid.trim() && validateTxid(depositTxid, depositNetwork).valid
+                                  ? 'border-emerald-500/80 focus:border-emerald-500'
+                                  : theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white focus:border-blue-500' : 'bg-white border-slate-200 focus:border-blue-500'
+                            }`}
+                          />
+
+                          {depositTxid.trim().length > 0 && (
+                            <div className={`absolute ${lang === 'fa' ? 'left-3' : 'right-3'} top-3 flex items-center gap-1 text-[10px]`}>
+                              {validateTxid(depositTxid, depositNetwork).valid ? (
+                                <span className="text-emerald-500 font-bold flex items-center gap-1 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                  <Check size={12} />
+                                  <span>{depositTxid.trim().length} {lang === 'fa' ? 'کاراکتر' : 'chars'}</span>
+                                </span>
+                              ) : (
+                                <span className="text-amber-500 font-bold flex items-center gap-1 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                                  <AlertCircle size={12} />
+                                  <span>{depositTxid.trim().length} {lang === 'fa' ? 'کاراکتر' : 'chars'}</span>
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {txidError && (
+                          <div className="flex items-start gap-1.5 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] leading-relaxed">
+                            <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                            <span>{txidError}</span>
+                          </div>
+                        )}
+
+                        {/* Network Rule Card */}
+                        <div className={`p-3 rounded-xl border text-[11px] space-y-1 ${
+                          theme === 'dark' ? 'bg-slate-950/60 border-slate-900 text-slate-400' : 'bg-slate-50 border-slate-200/80 text-slate-600'
+                        }`}>
+                          <div className="flex items-center justify-between font-bold text-slate-300">
+                            <span>{lang === 'fa' ? 'فرمت مجاز هش برای شبکه انتخاب‌شده:' : 'Valid Hash Rule for Selected Network:'}</span>
+                            <span className="text-blue-500 font-mono font-extrabold">{depositNetwork.toUpperCase()}</span>
+                          </div>
+                          <p className="text-[11px] leading-relaxed opacity-90">
+                            {depositNetwork === 'trc20' && (
+                              lang === 'fa' 
+                                ? 'کد هش ترون (TronScan) شامل دقیقا ۶۴ کاراکتر هگزادسیپمال است.' 
+                                : 'TRON TxID must be exactly 64 hex characters long.'
+                            )}
+                            {depositNetwork === 'erc20' && (
+                              lang === 'fa' 
+                                ? 'کد هش اتریوم (Etherscan) شامل ۶۶ کاراکتر (با پیشوند 0x) است.' 
+                                : 'Ethereum TxID consists of 66 characters starting with 0x prefix.'
+                            )}
+                            {depositNetwork === 'bep20' && (
+                              lang === 'fa' 
+                                ? 'کد هش بایننس اسمارت چین (BscScan) شامل ۶۶ کاراکتر (با پیشوند 0x) است.' 
+                                : 'BSC TxID consists of 66 characters starting with 0x prefix.'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button 
+                        type="submit"
+                        className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl transition-all mt-4 cursor-pointer"
+                      >
+                        {t.submitDeposit}
+                      </button>
+                    </form>
+                  )}
+
+                  {/* Withdraw View */}
+                  {walletTab === 'withdraw' && (
+                    <form onSubmit={handleWithdrawSubmit} className="space-y-4">
+                      {/* Destination address */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-xs font-bold text-slate-400 uppercase">{t.destinationAddress}</label>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">
+                            {depositNetwork === 'trc20' && (lang === 'fa' ? 'الگو: شروع با T (۳۴ کاراکتر)' : 'Pattern: Starts with T (34 chars)')}
+                            {(depositNetwork === 'erc20' || depositNetwork === 'bep20') && (lang === 'fa' ? 'الگو: شروع با 0x (۴۲ کاراکتر)' : 'Pattern: Starts with 0x (42 chars)')}
+                          </span>
+                        </div>
+
+                        <div className="relative">
+                          <input 
+                            type="text" 
+                            value={withdrawAddress}
+                            onChange={(e) => {
+                              setWithdrawAddress(e.target.value);
+                              if (withdrawAddrError) setWithdrawAddrError('');
+                            }}
+                            placeholder={
+                              depositNetwork === 'trc20'
+                                ? (lang === 'fa' ? 'مثال: TUtwXkXYZ123abcTRC20dummyAddressDepositActive' : 'e.g., TUtwXkXYZ123abcTRC20dummyAddressDepositActive')
+                                : (lang === 'fa' ? 'مثال: 0x123ERC20SecureAddressForAssetChainRWAStore' : 'e.g., 0x123ERC20SecureAddressForAssetChainRWAStore')
+                            }
+                            className={`w-full p-3 font-mono text-xs rounded-xl border focus:outline-none transition-all ${
+                              withdrawAddrError 
+                                ? 'border-red-500 bg-red-500/5 text-red-200 focus:border-red-500' 
+                                : withdrawAddress.trim() && validateWithdrawAddress(withdrawAddress, depositNetwork).valid
+                                  ? 'border-emerald-500/80 focus:border-emerald-500'
+                                  : theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white focus:border-blue-500' : 'bg-white border-slate-200 focus:border-blue-500'
+                            }`}
+                          />
+
+                          {withdrawAddress.trim().length > 0 && (
+                            <div className={`absolute ${lang === 'fa' ? 'left-3' : 'right-3'} top-3 flex items-center gap-1 text-[10px]`}>
+                              {validateWithdrawAddress(withdrawAddress, depositNetwork).valid ? (
+                                <span className="text-emerald-500 font-bold flex items-center gap-1 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                  <Check size={12} />
+                                  <span>{withdrawAddress.trim().length} {lang === 'fa' ? 'کاراکتر' : 'chars'}</span>
+                                </span>
+                              ) : (
+                                <span className="text-amber-500 font-bold flex items-center gap-1 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                                  <AlertCircle size={12} />
+                                  <span>{withdrawAddress.trim().length} {lang === 'fa' ? 'کاراکتر' : 'chars'}</span>
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {withdrawAddrError && (
+                          <div className="flex items-start gap-1.5 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] leading-relaxed">
+                            <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                            <span>{withdrawAddrError}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Withdraw amount */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">{t.amountUsdt}</label>
+                        <input 
+                          type="number" 
+                          value={withdrawAmount}
+                          onChange={(e) => setWithdrawAmount(e.target.value)}
+                          placeholder={t.minAmount}
+                          className={`w-full p-3 rounded-xl border focus:outline-none focus:border-blue-500 text-sm ${
+                            theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200'
+                          }`}
+                        />
+                      </div>
+
+                      <button 
+                        type="submit"
+                        className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl transition-all mt-4 cursor-pointer"
+                      >
+                        {t.requestWithdraw}
+                      </button>
+                    </form>
+                  )}
+
+                </div>
+              </section>
+            )}
+
+            {/* View 4: Transaction History Table */}
+            {currentTab === 'history' && (
+              <section className="space-y-6">
+                <div>
+                  <h1 className="text-2xl font-extrabold tracking-tight">{t.transactionHistory}</h1>
+                  <p className="text-slate-400 text-xs mt-1">{lang === 'fa' ? 'سوابق واریز، برداشت و معاملات گذشته شما' : 'History of your deposits, withdrawals, and trades'}</p>
+                </div>
+
+                <div className={`rounded-3xl border overflow-hidden shadow-sm ${
+                  theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                }`}>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-start">
+                      <thead>
+                        <tr className={`border-b text-xs font-bold uppercase text-slate-400 text-start ${
+                          theme === 'dark' ? 'border-slate-800 bg-slate-950/40' : 'border-slate-200 bg-slate-50'
+                        }`}>
+                          <th className="p-4 text-start">{t.thType}</th>
+                          <th className="p-4 text-center">{t.thAmount}</th>
+                          <th className="p-4 text-center">{t.thDate}</th>
+                          <th className="p-4 text-end">{t.thStatus}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800 text-xs">
+                        {transactions.map(tx => (
+                          <tr 
+                            key={tx.id}
+                            className={`transition-colors hover:bg-slate-800/10 ${
+                              theme === 'dark' ? 'hover:bg-slate-800/20' : 'hover:bg-slate-100/50'
+                            }`}
+                          >
+                            <td className="p-4 font-semibold">
+                              <span className="capitalize">{lang === 'fa' ? t['hist_' + tx.type] : tx.type}</span>
+                              <span className="text-[10px] text-slate-400 font-mono ms-2">({tx.asset})</span>
+                            </td>
+                            <td className="p-4 text-center font-mono font-bold" dir="ltr">
+                              {tx.amount}
+                            </td>
+                            <td className="p-4 text-center text-slate-400 font-mono">
+                              {tx.date}
+                            </td>
+                            <td className="p-4 text-end">
+                              <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold ${
+                                tx.status === 'completed'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                  : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              }`}>
+                                {lang === 'fa' ? t['stat_' + tx.status] : tx.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* View 5: Support Tickets */}
+            {currentTab === 'support' && (
+              <section className="space-y-6">
+                <div>
+                  <h1 className="text-2xl font-extrabold tracking-tight">{t.supportCenter}</h1>
+                  <p className="text-slate-400 text-xs mt-1">{lang === 'fa' ? 'پاسخگویی تیکت‌های شما در کمتر از ۷۲ ساعت' : 'Get in touch with support agents'}</p>
+                </div>
+
+                <div className={`rounded-3xl border p-6 shadow-sm max-w-xl mx-auto space-y-4 ${
+                  theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                }`}>
+                  <form onSubmit={handleSupportSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase">{t.describeIssue}</label>
+                      <textarea
+                        rows={5}
+                        value={supportText}
+                        onChange={(e) => setSupportText(e.target.value)}
+                        placeholder={t.howCanHelp}
+                        className={`w-full p-3 rounded-xl border focus:outline-none focus:border-blue-500 text-sm ${
+                          theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200'
+                        }`}
+                        required
+                      ></textarea>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl transition-all"
+                    >
+                      {t.submitTicket}
+                    </button>
+                  </form>
+                </div>
+              </section>
+            )}
+
+
+
+            {/* View 6: About Us */}
+            {currentTab === 'about' && (
+              <section className="space-y-6 animate-fade-in">
+                <div>
+                  <h1 className="text-2xl font-extrabold tracking-tight">
+                    {lang === 'fa' ? 'درباره AssetChain' : 'About AssetChain'}
+                  </h1>
+                  <p className="text-slate-400 text-xs mt-1">
+                    {lang === 'fa' ? 'نسل بعدی مالکیت دارایی‌های واقعی روی زنجیره' : 'The next generation of real-world asset ownership'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className={`p-6 rounded-3xl border shadow-sm space-y-3 ${
+                    theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                  }`}>
+                    <div className="w-10 h-10 bg-blue-600/10 text-blue-500 rounded-xl flex items-center justify-center font-bold">
+                      <ShieldCheck size={20} />
+                    </div>
+                    <h3 className={`text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      {lang === 'fa' ? '۱۰۰٪ پشتوانه فیزیکی' : '100% Physical Custody'}
+                    </h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      {lang === 'fa' 
+                        ? 'تمامی توکن‌ها دارای پشتوانه شمش‌های طلا با عیار استاندارد و اسناد رسمی املاک ثبت شده در سوئیس و امارات هستند.'
+                        : 'Every token is fully backed by certified gold bullion and legally registered properties in Switzerland & UAE.'}
+                    </p>
+                  </div>
+
+                  <div className={`p-6 rounded-3xl border shadow-sm space-y-3 ${
+                    theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                  }`}>
+                    <div className="w-10 h-10 bg-emerald-600/10 text-emerald-500 rounded-xl flex items-center justify-center font-bold">
+                      <CheckCircle size={20} />
+                    </div>
+                    <h3 className={`text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      {lang === 'fa' ? 'حساب‌رسی و شفافیت آنی' : 'Audited Proof of Reserves'}
+                    </h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      {lang === 'fa' 
+                        ? 'موسسه بین‌المللی SGS به عنوان حسابرس مستقل، موجودی فیزیکی خزانه‌ها را به صورت دوره‌ای تایید و گزارش می‌کند.'
+                        : 'Independent global auditor SGS performs regular reserve verifications, matching physical assets with on-chain supply.'}
+                    </p>
+                  </div>
+
+                  <div className={`p-6 rounded-3xl border shadow-sm space-y-3 ${
+                    theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                  }`}>
+                    <div className="w-10 h-10 bg-purple-600/10 text-purple-500 rounded-xl flex items-center justify-center font-bold">
+                      <Coins size={20} />
+                    </div>
+                    <h3 className={`text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      {lang === 'fa' ? 'سرمایه‌گذاری خرد شده' : 'Fractionalized & Inclusive'}
+                    </h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      {lang === 'fa' 
+                        ? 'ما موانع سرمایه‌گذاری را حذف کرده‌ایم تا هر شخص بتواند با حداقل ۱ تتر، مالک سهم‌های ارزشمند در کلاس‌های دارایی لوکس شود.'
+                        : 'We bypass high-capital entry limits, letting anyone buy fractions of elite physical assets starting with only 1 USDT.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className={`p-6 rounded-3xl border space-y-4 ${
+                  theme === 'dark' ? 'bg-slate-900/40 border-slate-800' : 'bg-slate-100/50 border-slate-200'
+                }`}>
+                  <h3 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    {lang === 'fa' ? 'ماموریت AssetChain' : 'The AssetChain Mission'}
+                  </h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    {lang === 'fa'
+                      ? 'هدف ما ایجاد بستری امن و عادلانه برای دسترسی همگانی به دارایی‌های باثبات جهانی است. ما با ادغام فناوری پیشرفته بلاکچین و قوانین شفاف مالی، بستری ایجاد کرده‌ایم تا نقدینگی و امنیت در بالاترین سطح ممکن در اختیار سرمایه‌گذاران خرد قرار گیرد.'
+                      : 'Our mission is to democratize high-yield, secure investment classes. By combining state-of-the-art decentralized ledgers with compliant legal trust frameworks, we provide retail and institutional investors alike with unparalleled liquidity and audited physical backing.'}
+                  </p>
+                </div>
+              </section>
+            )}
+
+            {/* View 7: Contact Us */}
+            {currentTab === 'contact' && (
+              <section className="space-y-6">
+                <div>
+                  <h1 className="text-2xl font-extrabold tracking-tight">
+                    {lang === 'fa' ? 'ارتباط با ما' : 'Contact Us'}
+                  </h1>
+                  <p className="text-slate-400 text-xs mt-1">
+                    {lang === 'fa' ? 'پاسخگویی سریع و پشتیبانی ۲۴ ساعته در تمامی روزهای هفته' : '24/7 global coverage and secure ticket submission'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Contact Form */}
+                  <div className={`p-6 rounded-3xl border shadow-sm space-y-4 ${
+                    theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                  }`}>
+                    <h3 className={`text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      {lang === 'fa' ? 'ارسال پیام مستقیم' : 'Send a message'}
+                    </h3>
+                    <form onSubmit={handleSupportSubmit} className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-400">{lang === 'fa' ? 'موضوع پیام' : 'Subject'}</label>
+                        <input 
+                          type="text" 
+                          placeholder={lang === 'fa' ? 'مثال: سوال در مورد واریز تتر' : 'e.g. Deposit validation question'}
+                          className={`w-full p-3 rounded-xl border focus:outline-none focus:border-blue-500 text-xs ${
+                            theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200'
+                          }`}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-400">{t.describeIssue}</label>
+                        <textarea
+                          rows={4}
+                          value={supportText}
+                          onChange={(e) => setSupportText(e.target.value)}
+                          placeholder={t.howCanHelp}
+                          className={`w-full p-3 rounded-xl border focus:outline-none focus:border-blue-500 text-xs ${
+                            theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200'
+                          }`}
+                          required
+                        ></textarea>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+                      >
+                        {lang === 'fa' ? 'ثبت و ارسال پیام' : 'Send Message'}
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Office Info & coordinates */}
+                  <div className="space-y-6">
+                    <div className={`p-6 rounded-3xl border shadow-sm space-y-4 ${
+                      theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                    }`}>
+                      <h3 className={`text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                        {lang === 'fa' ? 'دفاتر بین‌المللی AssetChain' : 'Global Registered Offices'}
+                      </h3>
+                      
+                      <div className="space-y-4 text-xs font-medium">
+                        <div className="flex gap-3 items-start">
+                          <MapPin size={16} className="text-blue-500 shrink-0 mt-0.5" />
+                          <div>
+                            <p className={theme === 'dark' ? 'text-slate-200 font-bold' : 'text-slate-800 font-bold'}>
+                              {lang === 'fa' ? 'دفتر دبی (امارات متحده عربی)' : 'Dubai Corporate HQ (UAE)'}
+                            </p>
+                            <p className="text-slate-400 mt-0.5">
+                              {lang === 'fa' ? 'برج خلیفه، طبقه ۴۲، دبی، امارات متحده عربی' : 'Burj Khalifa, Floor 42, Downtown Dubai, UAE'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3 items-start">
+                          <MapPin size={16} className="text-blue-500 shrink-0 mt-0.5" />
+                          <div>
+                            <p className={theme === 'dark' ? 'text-slate-200 font-bold' : 'text-slate-800 font-bold'}>
+                              {lang === 'fa' ? 'دفتر سوئیس (خزانه‌داری)' : 'Zurich Vault Registry (Switzerland)'}
+                            </p>
+                            <p className="text-slate-400 mt-0.5">
+                              {lang === 'fa' ? 'خیابان باهنوف، پلاک ۱۸، زوریخ، سوئیس' : 'Bahnhofstrasse 18, 8001 Zurich, Switzerland'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3 items-start">
+                          <Clock size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                          <div>
+                            <p className={theme === 'dark' ? 'text-slate-200 font-bold' : 'text-slate-800 font-bold'}>
+                              {lang === 'fa' ? 'ساعات کاری ناظران فیزیکی' : 'Physical Custody Audit Hours'}
+                            </p>
+                            <p className="text-slate-400 mt-0.5">
+                              {lang === 'fa' ? 'شنبه تا چهارشنبه - ۰۹:۰۰ الی ۱۷:۰۰ به وقت اروپای مرکزی' : 'Mon - Fri, 09:00 - 17:00 CET'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={`p-6 rounded-3xl border shadow-sm space-y-2 text-xs font-semibold ${
+                      theme === 'dark' ? 'bg-slate-900/30 border-slate-800/60' : 'bg-slate-100/60 border-slate-200'
+                    }`}>
+                      <p className="text-slate-400">{lang === 'fa' ? 'آدرس پست الکترونیکی:' : 'Corporate Support Email:'}</p>
+                      <p className="text-blue-500 font-bold font-mono">support@assetchain.app</p>
+                      <p className="text-slate-400 mt-2">{lang === 'fa' ? 'پشتیبانی برخط تلگرام:' : 'Direct Telegram Support Channel:'}</p>
+                      <p className="text-blue-500 font-bold font-mono">@AssetChain_Support</p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+          </div>
+      </div>
+      )}
+      </div>
+
+      {/* Auth Modal (Sign In / Sign Up) */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`w-full max-w-md rounded-3xl border p-6 md:p-8 space-y-6 relative shadow-2xl transition-all ${
+            theme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            {/* Close */}
+            <button 
+              onClick={() => setIsAuthModalOpen(false)} 
+              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+            >
+              <X size={18} />
+            </button>
+
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">
+                {authMode === 'signIn' ? t.signIn : t.signUp}
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                {lang === 'fa' ? 'سرمایه‌گذاری روی دارایی‌های دنیای واقعی با امنیت بالا' : 'Access high-yield secured asset tokens'}
+              </p>
+            </div>
+
+            {authError && (
+              <div className="p-3 bg-rose-950/20 border border-rose-500/30 rounded-xl text-xs text-rose-400 font-semibold text-center">
+                {authError}
+              </div>
+            )}
+
+            <form onSubmit={handleAuthSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-400 uppercase">{t.usernameOrEmail}</label>
+                <input 
+                  type="text" 
+                  value={authUsername}
+                  onChange={(e) => setAuthUsername(e.target.value)}
+                  className={`w-full p-3 rounded-xl border focus:outline-none focus:border-blue-500 text-sm ${
+                    theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200'
+                  }`}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-400 uppercase">{t.password}</label>
+                <input 
+                  type="password" 
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  className={`w-full p-3 rounded-xl border focus:outline-none focus:border-blue-500 text-sm ${
+                    theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200'
+                  }`}
+                  required
+                />
+              </div>
+
+              <button 
+                type="submit"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-md mt-2"
+              >
+                {authMode === 'signIn' ? t.signIn : t.signUp}
+              </button>
+            </form>
+
+            <div className="text-center">
+              <button 
+                onClick={() => {
+                  setAuthMode(authMode === 'signIn' ? 'signUp' : 'signIn');
+                  setAuthError('');
+                }}
+                className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
+              >
+                {authMode === 'signIn' ? t.noAccount : t.hasAccount}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Buy Order Confirmation Modal */}
+      {isBuyModalOpen && selectedAsset && (
+        <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`w-full max-w-md rounded-3xl border p-6 space-y-6 relative shadow-2xl ${
+            theme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            <button 
+              onClick={() => setIsBuyModalOpen(false)} 
+              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+            >
+              <X size={18} />
+            </button>
+
+            <div>
+              <h2 className="text-lg font-bold tracking-tight">{t.confirmBuy}</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{lang === 'fa' ? 'سفارش خرید دارایی RWA' : 'Buy secured real-world token shares'}</p>
+            </div>
+
+            <div className={`p-4 rounded-xl flex items-center justify-between ${
+              theme === 'dark' ? 'bg-slate-950/60' : 'bg-slate-50'
+            }`}>
+              <div>
+                <span className="text-xs text-slate-400 font-bold uppercase font-mono">#{selectedAsset.id}</span>
+                <p className="text-sm font-bold">{lang === 'fa' ? selectedAsset.faName : selectedAsset.enName}</p>
+              </div>
+              <div className="text-end">
+                <span className="text-xs text-slate-400">{t.tokenPrice}</span>
+                <p className="text-sm font-black text-blue-500">{selectedAsset.price} USDT</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleOpenAssetInfo(selectedAsset)}
+              className="w-full text-xs text-blue-400 hover:text-blue-300 font-bold flex items-center justify-center gap-1.5 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl transition-all cursor-pointer border border-blue-500/20"
+            >
+              <Info size={13} />
+              <span>{lang === 'fa' ? 'مشاهده شناسنامه و پشتوانه فیزیکی دارایی' : 'View Asset Specs & Physical Backing'}</span>
+            </button>
+
+            {/* Modal Sub-Tabs: Instant / OTC / Alert */}
+            <div className={`flex p-1 rounded-xl border ${
+              theme === 'dark' ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <button
+                type="button"
+                onClick={() => setBuyModalTab('instant')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  buyModalTab === 'instant'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-650'
+                }`}
+              >
+                {lang === 'fa' ? 'خرید فوری' : 'Instant Buy'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBuyModalTab('limit');
+                  if (!buyLimitPrice) setBuyLimitPrice(selectedAsset.price.toString());
+                }}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  buyModalTab === 'limit'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-650'
+                }`}
+              >
+                {lang === 'fa' ? 'سفارش محدود / OTC' : 'OTC / Limit'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBuyModalTab('alert');
+                  if (!buyAlertPrice) setBuyAlertPrice(selectedAsset.price.toString());
+                }}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  buyModalTab === 'alert'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-650'
+                }`}
+              >
+                {lang === 'fa' ? 'هشدار قیمت' : 'Price Alert'}
+              </button>
+            </div>
+
+            <form onSubmit={handleModalSubmit} className="space-y-4">
+              {buyModalTab === 'instant' && (
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-400 uppercase">{t.amountToInvest}</label>
+                    <div className="relative">
+                      <input 
+                        type="number" 
+                        value={buyAmount}
+                        onChange={(e) => setBuyAmount(e.target.value)}
+                        placeholder="Enter USDT Amount"
+                        className={`w-full p-3 pr-16 rounded-xl border focus:outline-none focus:border-blue-500 text-sm ${
+                          theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200'
+                        }`}
+                        required={buyModalTab === 'instant'}
+                      />
+                      <span className="absolute right-3 top-3 text-xs font-bold text-blue-500">
+                        USDT
+                      </span>
+                    </div>
+                    {currentUser && (
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {lang === 'fa' ? 'موجودی آزاد:' : 'Available Balance:'} {currentUser.usdtBalance.toLocaleString()} USDT
+                      </p>
+                    )}
+                  </div>
+
+                  {(() => {
+                    const val = parseFloat(buyAmount) || 0;
+                    const fee = val * 0.001;
+                    const shares = Math.floor(val / selectedAsset.price) || 0;
+                    const total = val + fee;
+
+                    return (
+                      <div className={`p-4 rounded-xl text-xs space-y-2 font-medium ${
+                        theme === 'dark' ? 'bg-slate-950/40' : 'bg-slate-50'
+                      }`}>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">{t.estShares}</span>
+                          <span className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{shares.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">{t.fee}</span>
+                          <span className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{fee.toFixed(2)} USDT</span>
+                        </div>
+                        <hr className="border-slate-800/80 my-2" />
+                        <div className="flex justify-between text-sm font-extrabold">
+                          <span className="text-slate-400">{t.totalToPay}</span>
+                          <span className="text-blue-500">{total.toFixed(2)} USDT</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {buyModalTab === 'limit' && (
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-400 uppercase">
+                      {lang === 'fa' ? 'قیمت خرید هدف (USDT)' : 'Target Buy Price (USDT)'}
+                    </label>
+                    <input 
+                      type="number" 
+                      step="0.0001"
+                      value={buyLimitPrice}
+                      onChange={(e) => setBuyLimitPrice(e.target.value)}
+                      placeholder={selectedAsset.price.toString()}
+                      className={`w-full p-3 rounded-xl border focus:outline-none focus:border-blue-500 text-sm ${
+                        theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200'
+                      }`}
+                      required={buyModalTab === 'limit'}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-400 uppercase">
+                      {lang === 'fa' ? 'حجم خرید (تعداد سهم)' : 'Buy Volume (Shares)'}
+                    </label>
+                    <input 
+                      type="number" 
+                      value={buyLimitShares}
+                      onChange={(e) => setBuyLimitShares(e.target.value)}
+                      placeholder={lang === 'fa' ? 'تعداد سهم مورد نظر برای خرید اتوماتیک' : 'Number of shares to buy automatically'}
+                      className={`w-full p-3 rounded-xl border focus:outline-none focus:border-blue-500 text-sm ${
+                        theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200'
+                      }`}
+                      required={buyModalTab === 'limit'}
+                    />
+                    {currentUser && (
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {lang === 'fa' ? 'موجودی آزاد:' : 'Available Balance:'} {currentUser.usdtBalance.toLocaleString()} USDT
+                      </p>
+                    )}
+                  </div>
+
+                  {(() => {
+                    const price = parseFloat(buyLimitPrice) || 0;
+                    const shares = parseFloat(buyLimitShares) || 0;
+                    const totalCost = price * shares;
+                    return (
+                      <div className={`p-4 rounded-xl text-xs space-y-2 font-medium ${
+                        theme === 'dark' ? 'bg-slate-950/40' : 'bg-slate-50'
+                      }`}>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">{lang === 'fa' ? 'ارزش تخمینی کل سفارش' : 'Estimated Order Total'}</span>
+                          <span className="text-blue-500 font-bold">{totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDT</span>
+                        </div>
+                        <p className="text-[9.5px] text-slate-400 leading-normal mt-1 font-semibold">
+                          {lang === 'fa' 
+                            ? '💡 سفارش OTC / محدود شما ذخیره شده و با رسیدن قیمت زنده دارایی به نرخ تعیین شده، به صورت کاملاً خودکار معامله انجام می‌گردد.' 
+                            : '💡 Your OTC / Limit order will be stored and executed automatically as soon as the live asset price hits your target.'}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {buyModalTab === 'alert' && (
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-400 uppercase">
+                      {lang === 'fa' ? 'قیمت هدف برای هشدار (USDT)' : 'Target Price for Alert (USDT)'}
+                    </label>
+                    <input 
+                      type="number" 
+                      step="0.0001"
+                      value={buyAlertPrice}
+                      onChange={(e) => setBuyAlertPrice(e.target.value)}
+                      placeholder={selectedAsset.price.toString()}
+                      className={`w-full p-3 rounded-xl border focus:outline-none focus:border-blue-500 text-sm ${
+                        theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200'
+                      }`}
+                      required={buyModalTab === 'alert'}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-400 uppercase">
+                      {lang === 'fa' ? 'شرایط فعال شدن هشدار' : 'Alert Condition'}
+                    </label>
+                    <select
+                      value={buyAlertCondition}
+                      onChange={(e) => setBuyAlertCondition(e.target.value as 'above' | 'below')}
+                      className={`w-full p-3 rounded-xl border focus:outline-none focus:border-blue-500 text-xs font-semibold ${
+                        theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200'
+                      }`}
+                    >
+                      <option value="above">
+                        {lang === 'fa' ? 'قیمت به بالای هدف حرکت کند (>=)' : 'Price goes above target (>=)'}
+                      </option>
+                      <option value="below">
+                        {lang === 'fa' ? 'قیمت به زیر هدف حرکت کند (<=)' : 'Price goes below target (<=)'}
+                      </option>
+                    </select>
+                  </div>
+
+                  <div className={`p-4 rounded-xl text-xs space-y-1 leading-normal text-slate-400 ${
+                    theme === 'dark' ? 'bg-slate-950/40' : 'bg-slate-50'
+                  }`}>
+                    <p className="font-semibold">
+                      {lang === 'fa'
+                        ? '💡 پس از رسیدن قیمت به هدف تعیین شده، یک نوتیفیکیشن هشدار فوری روی صفحه برای شما ارسال خواهد شد.'
+                        : '💡 Once the live asset price crosses your target threshold, an instant on-screen alert notification will be dispatched.'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <button 
+                type="submit"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-md mt-2"
+              >
+                {buyModalTab === 'instant' ? t.confirmBuy : buyModalTab === 'limit' ? (lang === 'fa' ? 'ثبت سفارش محدود / OTC' : 'Set OTC / Limit Order') : (lang === 'fa' ? 'تنظیم هشدار قیمت' : 'Set Price Alert')}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Sell Order Confirmation Modal */}
+      {isSellModalOpen && selectedAsset && (
+        <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`w-full max-w-md rounded-3xl border p-6 space-y-6 relative shadow-2xl ${
+            theme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            <button 
+              onClick={() => setIsSellModalOpen(false)} 
+              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+            >
+              <X size={18} />
+            </button>
+
+            <div>
+              <h2 className="text-lg font-bold tracking-tight">{t.confirmSell}</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{lang === 'fa' ? 'سفارش فروش سهم دارایی RWA' : 'Liquidate asset tokens back to USDT'}</p>
+            </div>
+
+            <div className={`p-4 rounded-xl flex items-center justify-between ${
+              theme === 'dark' ? 'bg-slate-950/60' : 'bg-slate-50'
+            }`}>
+              <div>
+                <span className="text-xs text-slate-400 font-bold uppercase font-mono">#{selectedAsset.id}</span>
+                <p className="text-sm font-bold">{lang === 'fa' ? selectedAsset.faName : selectedAsset.enName}</p>
+              </div>
+              <div className="text-end">
+                <span className="text-xs text-slate-400">{t.tokenPrice}</span>
+                <p className="text-sm font-black text-amber-500">{selectedAsset.price} USDT</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSellSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-slate-400 uppercase">{t.sharesToSell}</label>
+                  <span className="text-[10px] text-slate-400 font-bold">
+                    {t.ownedShares.replace('{num}', activeMaxShares.toLocaleString())}
+                  </span>
+                </div>
+                <div className="relative">
+                  <input 
+                    type="number" 
+                    value={sellShares}
+                    onChange={(e) => setSellShares(e.target.value)}
+                    placeholder="Enter Shares count"
+                    className={`w-full p-3 pr-16 rounded-xl border focus:outline-none focus:border-blue-500 text-sm ${
+                      theme === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200'
+                    }`}
+                    required
+                  />
+                  <span className="absolute right-3 top-3 text-xs font-bold text-slate-500">
+                    {lang === 'fa' ? 'سهم' : 'Shares'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Real-time Sell details breakdown */}
+              {(() => {
+                const sharesCount = parseInt(sellShares) || 0;
+                const gross = sharesCount * selectedAsset.price;
+                const fee = gross * 0.001;
+                const net = gross - fee;
+
+                return (
+                  <div className={`p-4 rounded-xl text-xs space-y-2 font-medium ${
+                    theme === 'dark' ? 'bg-slate-950/40' : 'bg-slate-50'
+                  }`}>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">{t.grossValue}</span>
+                      <span className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{gross.toFixed(2)} USDT</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">{t.fee}</span>
+                      <span className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{fee.toFixed(2)} USDT</span>
+                    </div>
+                    <hr className="border-slate-800/80 my-2" />
+                    <div className="flex justify-between text-sm font-extrabold">
+                      <span className="text-slate-400">{t.netReceive}</span>
+                      <span className="text-emerald-500">{net.toFixed(2)} USDT</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <button 
+                type="submit"
+                className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-md mt-2"
+              >
+                {t.confirmSell}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Asset Specifications & Info Modal */}
+      {isInfoModalOpen && infoAsset && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className={`w-full max-w-2xl rounded-3xl border p-6 md:p-8 space-y-6 relative shadow-2xl my-8 ${
+            theme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            {/* Close Button */}
+            <button 
+              onClick={() => setIsInfoModalOpen(false)} 
+              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1.5 rounded-full hover:bg-slate-800/60 transition-all cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+
+            {/* Header Banner */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-800/20">
+              <div className="flex items-center gap-3">
+                <img 
+                  src={`https://flagcdn.com/32x24/${infoAsset.flag}.png`} 
+                  alt={infoAsset.flag}
+                  className="rounded shadow-sm shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                      #{infoAsset.id}
+                    </span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                      theme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {infoAsset.category === 'metals' && t.categoryMetals}
+                      {infoAsset.category === 'auto' && t.categoryAuto}
+                      {infoAsset.category === 'petro' && t.categoryPetro}
+                      {infoAsset.category === 'bank' && t.categoryBank}
+                      {infoAsset.category === 'real_estate' && t.categoryRealEstate}
+                      {infoAsset.category === 'commodities' && t.categoryCommodities}
+                      {infoAsset.category === 'global' && t.categoryGlobal}
+                    </span>
+                  </div>
+                  <h2 className="text-xl md:text-2xl font-black tracking-tight mt-1">
+                    {lang === 'fa' ? infoAsset.faName : infoAsset.enName}
+                  </h2>
+                  <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                    <MapPin size={13} className="text-slate-500" />
+                    <span>{lang === 'fa' ? infoAsset.locationFa : infoAsset.locationEn}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Live Price Badge */}
+              <div className="text-start sm:text-end bg-blue-500/10 border border-blue-500/20 p-3 rounded-2xl shrink-0">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">{t.tokenPrice}</span>
+                <p className="text-lg font-black text-blue-500 font-mono">
+                  {infoAsset.price.toLocaleString(undefined, { minimumFractionDigits: 2 })} USDT
+                </p>
+                <span className={`text-xs font-bold flex items-center sm:justify-end gap-1 mt-0.5 ${
+                  infoAsset.change >= 0 ? 'text-emerald-500' : 'text-rose-500'
+                }`}>
+                  {infoAsset.change >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                  <span>{infoAsset.change >= 0 ? '+' : ''}{infoAsset.change}%</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Main Info Sections */}
+            <div className="space-y-4">
+              
+              {/* Section 1: Asset Description */}
+              <div className={`p-4 md:p-5 rounded-2xl border space-y-2 ${
+                theme === 'dark' ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Info size={16} />
+                  <span>{t.assetOverview}</span>
+                </h3>
+                <p className="text-xs md:text-sm leading-relaxed text-slate-300">
+                  {(lang === 'fa' ? infoAsset.descriptionFa : infoAsset.descriptionEn) || (
+                    lang === 'fa' ? 'اطلاعات کامل و ساختار حقوقی این دارایی تحت نظارت متولیان بین‌المللی ثبت شده است.' : 'Full asset structure and legal details recorded under international regulated trust.'
+                  )}
+                </p>
+              </div>
+
+              {/* Section 2: Physical Backing & Custody */}
+              <div className={`p-4 md:p-5 rounded-2xl border space-y-3 ${
+                theme === 'dark' ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck size={16} />
+                  <span>{t.physicalBacking}</span>
+                </h3>
+                <p className="text-xs md:text-sm leading-relaxed text-slate-300">
+                  {(lang === 'fa' ? infoAsset.backingFa : infoAsset.backingEn) || (
+                    lang === 'fa' ? 'پشتوانه فیزیکی واقعی با گواهی انبارداری حسابرسی‌شده.' : 'Verified physical backing with audited warehouse certificates.'
+                  )}
+                </p>
+
+                <div className="pt-2 border-t border-slate-800/40 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold block uppercase">{t.custodianTitle}</span>
+                    <span className="font-semibold text-slate-200 mt-0.5 block">
+                      {(lang === 'fa' ? infoAsset.custodianFa : infoAsset.custodianEn) || (lang === 'fa' ? 'انبار رسمی و خزانه امانت‌داری' : 'Certified Custody Depository')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold block uppercase">{t.payoutSchedule}</span>
+                    <span className="font-semibold text-slate-200 mt-0.5 block">
+                      {(lang === 'fa' ? infoAsset.payoutIntervalFa : infoAsset.payoutIntervalEn) || (lang === 'fa' ? 'توزیع دوره‌ای سود' : 'Periodic Yield Distribution')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2.5: TSETMC Bourse Direct Link (For Bourse Stock Assets) */}
+              {(infoAsset.tsetmcUrl || infoAsset.flag === 'ir') && (
+                <div className={`p-4 md:p-5 rounded-2xl border space-y-3 transition-all ${
+                  theme === 'dark' 
+                    ? 'bg-gradient-to-r from-blue-950/40 via-slate-900 to-emerald-950/30 border-blue-500/30 shadow-lg shadow-blue-950/20' 
+                    : 'bg-gradient-to-r from-blue-50/90 via-white to-emerald-50/80 border-blue-300 shadow-sm'
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start sm:items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                        <Globe size={20} className="text-blue-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-xs font-black text-blue-400 uppercase tracking-wider">
+                            {t.tsetmcSectionTitle}
+                          </h3>
+                          {infoAsset.bourseSymbol && (
+                            <span className="text-[11px] font-black px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                              نماد بورس: {infoAsset.bourseSymbol}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-300/90 leading-relaxed mt-1">
+                          {t.tsetmcDesc}
+                        </p>
+                      </div>
+                    </div>
+
+                    <a 
+                      href={infoAsset.tsetmcUrl || `https://www.google.com/search?q=${encodeURIComponent('سایت tsetmc نماد ' + (infoAsset.bourseSymbol || infoAsset.faName))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-600/25 flex items-center justify-center gap-2 shrink-0 cursor-pointer w-full sm:w-auto"
+                    >
+                      <span>{t.tsetmcBtn}</span>
+                      <ExternalLink size={14} />
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Section 3: Token Specs & Risk */}
+              <div className={`p-4 md:p-5 rounded-2xl border space-y-3 ${
+                theme === 'dark' ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Coins size={16} />
+                  <span>{t.smartContractInfo}</span>
+                </h3>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                  <div className={`p-3 rounded-xl border ${theme === 'dark' ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200'}`}>
+                    <span className="text-[10px] text-slate-400 font-bold block">{t.riskLevelTitle}</span>
+                    <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                      infoAsset.riskLevel === 'Low' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    }`}>
+                      {infoAsset.riskLevel || 'Low'}
+                    </span>
+                  </div>
+
+                  <div className={`p-3 rounded-xl border ${theme === 'dark' ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200'}`}>
+                    <span className="text-[10px] text-slate-400 font-bold block">{lang === 'fa' ? 'استاندارد توکن' : 'Token Standard'}</span>
+                    <span className="font-mono text-xs font-bold text-slate-200 block mt-1">ERC-20 (RWA)</span>
+                  </div>
+
+                  <div className={`p-3 rounded-xl border ${theme === 'dark' ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200'}`}>
+                    <span className="text-[10px] text-slate-400 font-bold block">{lang === 'fa' ? 'کارمزد معامله' : 'Trading Fee'}</span>
+                    <span className="font-mono text-xs font-bold text-slate-200 block mt-1">0.10% USDT</span>
+                  </div>
+                </div>
+
+                {/* Sale Progress */}
+                <div className="space-y-1.5 pt-2">
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span className="text-slate-400">{t.saleProgress}</span>
+                    <span className="text-blue-400 font-bold">{infoAsset.progress}%</span>
+                  </div>
+                  <div className={`h-2 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-200'}`}>
+                    <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500" style={{ width: `${infoAsset.progress}%` }}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-slate-800/20">
+              <button 
+                onClick={() => setIsInfoModalOpen(false)}
+                className={`w-full sm:w-1/3 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  theme === 'dark' ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                {t.closeModal}
+              </button>
+
+              <button 
+                onClick={() => {
+                  setIsInfoModalOpen(false);
+                  if (!isLoggedIn) {
+                    setIsAuthModalOpen(true);
+                  } else {
+                    setSelectedAsset(infoAsset);
+                    setBuyAmount('');
+                    setIsBuyModalOpen(true);
+                  }
+                }}
+                className="w-full sm:w-2/3 py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer shadow-lg shadow-blue-600/20 text-center flex items-center justify-center gap-2"
+              >
+                <span>{t.proceedToBuy}</span>
+                <ArrowUpRight size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className={`border-t transition-colors duration-300 ${
+        theme === 'dark' ? 'bg-slate-950 border-slate-900 text-slate-400' : 'bg-white border-slate-200 text-slate-500'
+      }`}>
+        {/* Full-width Referral Invite Card */}
+        {currentTab !== 'history' && currentTab !== 'wallet' && (
+          <div className="max-w-7xl mx-auto px-4 md:px-8 pt-8 md:pt-12">
+            {/* Staking APY Referral Invite Card (gorgeous visual highlight) */}
+            <div className="w-full bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl md:rounded-3xl p-5 md:p-8 relative overflow-hidden text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
+              <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-white/10 rounded-full"></div>
+              <div className="absolute -top-10 -left-10 w-24 h-24 bg-blue-400/20 rounded-full blur-xl"></div>
+              
+              <div className="relative z-10 space-y-2 md:space-y-3 text-start">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                    <Share2 size={18} md:size={20} />
+                  </div>
+                  <h3 className="text-lg md:text-xl font-bold leading-tight">{t.shareAndEarn}</h3>
+                </div>
+                <p className="text-blue-100 text-[11px] md:text-sm mt-1 opacity-80 leading-relaxed max-w-xl">
+                  {t.referralText}
+                </p>
+              </div>
+              <div className="relative z-10 shrink-0 w-full md:w-64">
+                <button 
+                  onClick={handleCopyCode}
+                  className="w-full py-2.5 md:py-3 bg-white hover:bg-slate-50 text-blue-600 rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer hover:scale-[1.01]"
+                >
+                  {copiedCode ? <Check size={14} className="text-emerald-500" /> : null}
+                  <span>{copiedCode ? t.copied : t.referralCode}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Main Footer Content */}
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-16">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-12">
+            
+            {/* Column 1: Brand & Identity */}
+            <div className="space-y-3.5 text-start">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 md:w-8 md:h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/25">
+                  <Coins size={14} md:size={16} />
+                </div>
+                <span className={`text-base md:text-lg font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  {t.appName}
+                </span>
+              </div>
+              <p className="text-[11px] md:text-xs leading-relaxed opacity-85">
+                {lang === 'fa' 
+                  ? 'سرمایه‌گذاری در دارایی‌های دنیای واقعی (RWA) با امنیت کامل و پشتوانه فیزیکی ۱۰۰ درصدی بر روی شبکه بلاکچین. دسترسی آسان به سودآوری جهانی.'
+                  : 'Regulated, secured, and fully backed real-world asset (RWA) tokenization on-chain. Making global yields and institutional custody accessible to everyone.'}
+              </p>
+              
+              {/* Market Status Feed */}
+              <div className="space-y-2 pt-1">
+                <div className={`p-2.5 md:p-3 rounded-xl md:rounded-2xl border text-[10px] md:text-[11px] font-bold flex items-center justify-between ${
+                  theme === 'dark' ? 'bg-slate-900/40 border-slate-900/60' : 'bg-slate-50 border-slate-100'
+                }`}>
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                    <span>{t.marketStatus}</span>
+                  </span>
+                  <span className="text-blue-500 font-mono">{t.vol24h}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Column 2: RWA Marketplace Categories */}
+            <div className="space-y-3 md:space-y-4 text-start">
+              <h4 className={`text-[10px] md:text-xs font-black uppercase tracking-wider ${theme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>
+                {lang === 'fa' ? 'بازارهای سرمایه‌گذاری RWA' : 'RWA Market Sectors'}
+              </h4>
+              <ul className="space-y-2 text-[11px] md:text-xs">
+                {[
+                  { id: 'commodities', en: 'Gold & Commodities', fa: 'ذخایر شمش طلا' },
+                  { id: 'real_estate', en: 'Luxury Real Estate', fa: 'املاک و مستغلات لوکس' },
+                  { id: 'metals', en: 'High-Grade Metals', fa: 'فلزات و صنایع اساسی' },
+                  { id: 'global', en: 'Global Blue-Chip Shares', fa: 'سهام و اوراق بهادار جهانی' },
+                  { id: 'petro', en: 'Petrochemical Reserves', fa: 'پتروشیمی و صنایع نفتی' },
+                ].map(cat => (
+                  <li key={cat.id}>
+                    <button 
+                      onClick={() => {
+                        setMarketFilter(cat.id);
+                        setCurrentTab('market');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="hover:text-blue-500 transition-colors flex items-center gap-1.5 cursor-pointer text-start"
+                    >
+                      <span className="opacity-40">#</span>
+                      <span>{lang === 'fa' ? cat.fa : cat.en}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Column 3: Navigation & Platform */}
+            <div className="space-y-3 md:space-y-4 text-start">
+              <h4 className={`text-[10px] md:text-xs font-black uppercase tracking-wider ${theme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>
+                {lang === 'fa' ? 'ناوبری و پلتفرم' : 'Platform Navigation'}
+              </h4>
+              <ul className="space-y-2 text-[11px] md:text-xs">
+                {[
+                  { tab: 'home', label: t.home },
+                  { tab: 'market', label: t.assetsMarket },
+                  { tab: 'portfolio', label: t.portfolio, authRequired: true },
+                  { tab: 'wallet', label: t.wallet, authRequired: true },
+                  { tab: 'history', label: t.history, authRequired: true },
+                  { tab: 'about', label: t.aboutUs },
+                  { tab: 'contact', label: t.contactUs },
+                ].map(item => {
+                  if (item.authRequired && !isLoggedIn) return null;
+                  return (
+                    <li key={item.tab}>
+                      <button 
+                        onClick={() => {
+                          setCurrentTab(item.tab as any);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="hover:text-blue-500 transition-colors cursor-pointer text-start"
+                      >
+                        {item.label}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            {/* Column 4: Location & Support Details */}
+            <div className="space-y-3 md:space-y-4 text-start">
+              <h4 className={`text-[10px] md:text-xs font-black uppercase tracking-wider ${theme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>
+                {lang === 'fa' ? 'اطلاعات پشتیبانی و دفتر مرکزی' : 'Support & Legal Presence'}
+              </h4>
+              <div className="space-y-2.5 md:space-y-3.5 text-[11px] md:text-xs">
+                <div className="flex items-start gap-2">
+                  <MapPin size={14} md:size={16} className="text-blue-500 shrink-0 mt-0.5" />
+                  <p className="leading-relaxed">
+                    {lang === 'fa' 
+                      ? 'دفتر مرکزی: دبی، امارات، منطقه سیلیکون اوآسیس، برج فناوری' 
+                      : 'HQ Presence: Silicon Oasis Tech Tower, Dubai, United Arab Emirates'}
+                  </p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <ShieldCheck size={14} md:size={16} className="text-blue-500 shrink-0 mt-0.5" />
+                  <p className="leading-relaxed">
+                    {lang === 'fa' 
+                      ? 'امانت‌داری فیزیکی: زوریخ، سوئیس، صندوق امانات بانک کانتونال' 
+                      : 'Physical Custody: Zurich Canton Vaults, Switzerland'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MessageSquare size={14} md:size={16} className="text-blue-500 shrink-0" />
+                  <p className="font-mono font-bold hover:text-blue-500 transition-colors cursor-pointer text-start">
+                    support@assetchain.app
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Globe size={14} md:size={16} className="text-blue-500 shrink-0" />
+                  <p className="font-mono font-bold hover:text-blue-500 transition-colors cursor-pointer text-start">
+                    @AssetChain_Support
+                  </p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Separation Border */}
+          <hr className={`my-8 md:my-12 ${theme === 'dark' ? 'border-slate-900' : 'border-slate-100'}`} />
+
+          {/* Legal Disclaimer Box */}
+          <div className={`p-4 md:p-5 rounded-xl md:rounded-2xl border text-[10px] md:text-[11px] leading-relaxed mb-8 md:mb-12 text-start ${
+            theme === 'dark' 
+              ? 'bg-slate-900/20 border-slate-900/60 text-slate-500' 
+              : 'bg-slate-50 border-slate-100 text-slate-400'
+          }`}>
+            <p className="font-bold mb-1 uppercase text-[9px] md:text-[10px] text-blue-500 tracking-wider">
+              {lang === 'fa' ? 'سلب مسئولیت و شفافیت قانونی' : 'REGULATORY NOTICE & RISK DISCLOSURE'}
+            </p>
+            <p>
+              {lang === 'fa'
+                ? 'سلب مسئولیت: سرمایه‌گذاری روی دارایی‌های دنیای واقعی (RWA) شامل ریسک نوسان قیمت بازار می‌باشد. هر توکن AssetChain نماینده سهم مشخصی از دارایی‌های فیزیکی تحت پشتوانه کامل ۱:۱ بوده که دارای گزارش حسابرسی رسمی و تاییدیه مالکیت ثبتی است. دارایی‌های فیزیکی در خزانه‌های امن سوئیس و تحت قوانین نظارتی ذخیره‌سازی نگهداری می‌شوند. این پلتفرم صرفاً بستر معامله دارایی‌ها به صورت توکنایز شده بوده و خدمات مشاوره مالی ارایه نمی‌دهد.'
+                : 'Disclaimer: Real-World Asset (RWA) fractional token investments carry market risks due to commodity and asset price fluctuations. Every AssetChain token is physically backed 1:1, audited by regulated third-party custodians, and secured in Swiss high-security Canton vaults. Fractionalized shares represent actual beneficial interest. Past performance of asset growth yields does not guarantee future results. This platform serves as a digital transaction medium and does not provide financial advice.'}
+            </p>
+          </div>
+
+          {/* Bottom Row */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-6 text-[10px] md:text-[11px]">
+            <div className="flex items-center gap-2 font-bold text-center md:text-start">
+              <span>© 2026 {t.appName}. {t.rightsReserved}</span>
+            </div>
+
+            {/* Quick Links / Status indicators */}
+            <div className="flex flex-wrap items-center justify-center md:justify-end gap-3 md:gap-6">
+              <a href="#" className="hover:text-blue-500 transition-colors">{t.termsAndConditions}</a>
+              <span className="opacity-40">•</span>
+              <button onClick={() => { setCurrentTab('support'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-blue-500 transition-colors cursor-pointer">
+                {t.onlineSupport}
+              </button>
+              <span className="opacity-40">•</span>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                <span className="text-emerald-500 font-bold">{lang === 'fa' ? 'شبکه اصلی فعال' : 'Mainnet Connected'}</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </footer>
+
+    </div>
+  );
+}
